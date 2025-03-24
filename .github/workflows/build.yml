@@ -1,0 +1,48 @@
+name: Build PDF Watermark Remover
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        pip install -r requirements.txt
+        
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --onefile --windowed --icon=icon_remove_watermark.ico remove_watermark.py
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: build-artifacts
+        path: |
+          build/
+          dist/
+          *.spec
+        retention-days: 90
+        
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          dist/*.exe
+        draft: false
+        prerelease: false
