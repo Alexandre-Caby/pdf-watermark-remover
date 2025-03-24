@@ -75,7 +75,7 @@ jobs:
         name: Version ${{ steps.get_version.outputs.VERSION }}
         draft: false
         prerelease: false
-        body_path: ${{ github.workspace }}/CHANGELOG.md
+        body_path: CHANGELOG.md
         fail_on_unmatched_files: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
