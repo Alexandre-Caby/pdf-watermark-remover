@@ -10,7 +10,7 @@ jobs:
     runs-on: windows-latest
     
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -28,7 +28,7 @@ jobs:
         pyinstaller --onefile --windowed --icon=icon_remove_watermark.ico remove_watermark.py
         
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: build-artifacts
         path: |
