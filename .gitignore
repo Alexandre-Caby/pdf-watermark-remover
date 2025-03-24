@@ -1,0 +1,29 @@
+# Build and distribution folders
+build/
+dist/
+__pycache__/
+
+# PyInstaller
+*.spec
+
+# Virtual environment
+venv/
+env/
+
+# IDE files
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.pyc
+*.pyo
+
+# User data
+.filigrane_activation
+.filigrane_terms_accepted
