@@ -68,15 +68,16 @@ jobs:
       if: steps.get_version.outputs.IS_RELEASE == 'true'
       run: |
         if (-not (Test-Path "CHANGELOG.md")) {
-          @"
-            # Version ${{ steps.get_version.outputs.VERSION }}
+          @
+            "# Version ${{ steps.get_version.outputs.VERSION }}
             
             ## What's New
             - Initial release of PDF Watermark Remover
             - Support for removing diagonal watermarks
             - Support for removing footer watermarks
             - Batch processing support
-            - License activation system"@
+            - License activation system"
+          @
            | Out-File -FilePath "release_notes.md" -Encoding utf8
           echo "CHANGELOG_PATH=release_notes.md" >> $env:GITHUB_ENV
         } else {
