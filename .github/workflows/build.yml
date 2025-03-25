@@ -65,6 +65,27 @@ jobs:
           dist/*.exe
         retention-days: 90
     
+    - name: Find CHANGELOG.md
+      run: |
+        echo "Current directory: $PWD"
+        dir
+        
+        # Check common locations
+        $locations = @(
+          "CHANGELOG.md",
+          "../CHANGELOG.md",
+          "../../CHANGELOG.md",
+          "${{ github.workspace }}/CHANGELOG.md"
+        )
+        
+        foreach ($loc in $locations) {
+          if (Test-Path $loc) {
+            echo "Found at: $loc"
+            echo "CHANGELOG_PATH=$loc" >> $env:GITHUB_ENV
+            break
+          }
+        }
+    
     - name: Create GitHub Release
       if: steps.get_version.outputs.IS_RELEASE == 'true'
       id: create_release
@@ -73,9 +94,9 @@ jobs:
         files: |
           dist/Suppression_de_Filigrane_PDF-${{ steps.get_version.outputs.VERSION }}.exe
         name: Version ${{ steps.get_version.outputs.VERSION }}
+        body_path: ${{ env.CHANGELOG_PATH }}
         draft: false
         prerelease: false
-        body_path: ../CHANGELOG.md
         fail_on_unmatched_files: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
