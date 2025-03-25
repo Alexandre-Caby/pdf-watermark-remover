@@ -76,8 +76,8 @@ jobs:
             - Support for removing diagonal watermarks
             - Support for removing footer watermarks
             - Batch processing support
-            - License activation system
-          "@ | Out-File -FilePath "release_notes.md" -Encoding utf8
+            - License activation system"@
+           | Out-File -FilePath "release_notes.md" -Encoding utf8
           echo "CHANGELOG_PATH=release_notes.md" >> $env:GITHUB_ENV
         } else {
           echo "CHANGELOG_PATH=CHANGELOG.md" >> $env:GITHUB_ENV
