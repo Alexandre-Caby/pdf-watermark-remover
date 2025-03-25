@@ -56,29 +56,22 @@ jobs:
         $version = "${{ steps.get_version.outputs.VERSION }}"
         Rename-Item -Path "dist\remove_watermark.exe" -NewName "Suppression_de_Filigrane_PDF-$version.exe"
         
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: Suppression_de_Filigrane_PDF-${{ steps.get_version.outputs.VERSION }}
-        path: |
-          dist/*.exe
-        retention-days: 90
-    
     - name: Create release notes if CHANGELOG.md doesn't exist
       if: steps.get_version.outputs.IS_RELEASE == 'true'
       run: |
         if (-not (Test-Path "CHANGELOG.md")) {
-          @
-            "# Version ${{ steps.get_version.outputs.VERSION }}
-            
-            ## What's New
-            - Initial release of PDF Watermark Remover
-            - Support for removing diagonal watermarks
-            - Support for removing footer watermarks
-            - Batch processing support
-            - License activation system"
-          @
-           | Out-File -FilePath "release_notes.md" -Encoding utf8
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          $releaseNotes = @"
+# Version $version
+
+## What's New
+- Initial release of PDF Watermark Remover
+- Support for removing diagonal watermarks
+- Support for removing footer watermarks
+- Batch processing support
+- License activation system
+"@
+          $releaseNotes | Out-File -FilePath "release_notes.md" -Encoding utf8
           echo "CHANGELOG_PATH=release_notes.md" >> $env:GITHUB_ENV
         } else {
           echo "CHANGELOG_PATH=CHANGELOG.md" >> $env:GITHUB_ENV
