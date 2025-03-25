@@ -1,6 +1,7 @@
 name: Build and Release PDF Watermark Remover
+
 permissions:
-  contents: read
+  contents: write  # Changed from 'read' to 'write'
   pull-requests: write
   
 on:
@@ -65,25 +66,23 @@ jobs:
           dist/*.exe
         retention-days: 90
     
-    - name: Find CHANGELOG.md
+    - name: Create release notes if CHANGELOG.md doesn't exist
+      if: steps.get_version.outputs.IS_RELEASE == 'true'
       run: |
-        echo "Current directory: $PWD"
-        dir
-        
-        # Check common locations
-        $locations = @(
-          "CHANGELOG.md",
-          "../CHANGELOG.md",
-          "../../CHANGELOG.md",
-          "${{ github.workspace }}/CHANGELOG.md"
-        )
-        
-        foreach ($loc in $locations) {
-          if (Test-Path $loc) {
-            echo "Found at: $loc"
-            echo "CHANGELOG_PATH=$loc" >> $env:GITHUB_ENV
-            break
-          }
+        if (-not (Test-Path "CHANGELOG.md")) {
+          @"
+            # Version ${{ steps.get_version.outputs.VERSION }}
+            
+            ## What's New
+            - Initial release of PDF Watermark Remover
+            - Support for removing diagonal watermarks
+            - Support for removing footer watermarks
+            - Batch processing support
+            - License activation system
+          "@ | Out-File -FilePath "release_notes.md" -Encoding utf8
+          echo "CHANGELOG_PATH=release_notes.md" >> $env:GITHUB_ENV
+        } else {
+          echo "CHANGELOG_PATH=CHANGELOG.md" >> $env:GITHUB_ENV
         }
     
     - name: Create GitHub Release
