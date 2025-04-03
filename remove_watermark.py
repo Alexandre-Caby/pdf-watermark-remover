@@ -25,7 +25,10 @@ import base64
 import webbrowser
 import urllib.parse
 import json
+import ssl
 import urllib.request
+import secure_activation  # Added secure activation module
+import hmac
 
 class WatermarkRemoverApp:
     """Main application class for PDF watermark removal."""
@@ -38,7 +41,6 @@ class WatermarkRemoverApp:
         """Check if a newer version is available and offer to update."""
         try:
             # Get current version from local file
-            # We'll try to read the version from a file first, then fall back to hardcoded value
             current_version = "1.0"  # Fallback version
             try:
                 version_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "version.txt")
@@ -46,15 +48,21 @@ class WatermarkRemoverApp:
                     with open(version_file, "r") as f:
                         current_version = f.read().strip()
             except:
-                pass  # Use fallback if file can't be read
+                pass
             
             # GitHub API URL for latest release
             github_api_url = "https://api.github.com/repos/Alexandre-Caby/pdf-watermark-remover/releases/latest"
             
-            # Download release info
-            with urllib.request.urlopen(github_api_url, timeout=3) as response:
+            # Create a request with a custom User-Agent header
+            req = urllib.request.Request(github_api_url, headers={'User-Agent': 'Mozilla/5.0'})
+            
+            # Create an SSL context for secure HTTPS connections
+            context = ssl.create_default_context()
+            
+            # Download release info using the secure context
+            with urllib.request.urlopen(req, timeout=3, context=context) as response:
                 release_info = json.loads(response.read().decode('utf-8'))
-                
+            
             # Extract version (GitHub tag name without 'v' prefix)
             latest_version = release_info.get("tag_name", "").replace("v", "")
             download_url = release_info.get("assets", [{}])[0].get("browser_download_url", "")
@@ -1058,78 +1066,62 @@ Ce logiciel est fourni sous licence et peut être utilisé uniquement conformém
     #----------------------------------------------------------------
     
     def validate_activation(self):
-        """Validate if the software is activated with proper approval."""
+        """Validate if the software is activated using encrypted activation data."""
         try:
-            # Get unique machine identifier (based on hardware)
-            machine_id = str(uuid.getnode())  # MAC address-based unique ID
-            
-            # Location for activation file
+            machine_id = str(uuid.getnode())
             activation_file = os.path.join(os.path.expanduser("~"), ".filigrane_activation")
-            
-            # Check if activation file exists
             if not os.path.exists(activation_file):
-                # Not activated, show activation dialog
                 return self.request_activation(machine_id)
-                
-            # Read activation data
-            with open(activation_file, "r") as f:
-                activation_data = f.read().strip()
-                
-            # Decode and validate activation
             try:
-                # Decrypt activation data
-                decoded = base64.b64decode(activation_data).decode('utf-8')
-                parts = decoded.split('|')
+                with open(activation_file, "r") as f:
+                    encrypted_data = f.read().strip()
+                # Decrypt the activation data
+                data = secure_activation.decrypt_activation_data(encrypted_data)
+                stored_machine_id = data.get("machine_id", "")
+                expiry_date = data.get("expiry_date", "")
+                activation_code = data.get("activation_code", "")
                 
-                if len(parts) != 3:
-                    return self.request_activation(machine_id)
-                    
-                stored_machine_id, expiry_date, activation_code = parts
-                
-                # Check if activated for this machine
                 if stored_machine_id != machine_id:
                     return self.request_activation(machine_id)
                     
-                # Check if activation has expired
                 expiry = datetime.datetime.strptime(expiry_date, "%Y-%m-%d")
                 if datetime.datetime.now() > expiry:
                     messagebox.showwarning(
                         "Activation expirée",
-                        "Votre période d'activation a expiré. Veuillez contacter Alexandre Caby (Alternant ingénieur chez TechniFret) pour prolonger l'accès."
+                        "Votre période d'activation a expiré. Veuillez contacter l'administrateur."
                     )
                     return self.request_activation(machine_id)
-                    
-                # Validate activation code against machine ID
+                
                 expected_code = self.generate_activation_code(machine_id, expiry_date)
-                if activation_code != expected_code:
+                # Use constant-time comparison to mitigate timing attacks
+                if not hmac.compare_digest(activation_code, expected_code):
                     return self.request_activation(machine_id)
-                    
-                # Everything is valid
                 return True
-                
-            except Exception as e:
-                # Corrupted activation data
+            except (json.JSONDecodeError, ValueError, KeyError) as e:
+                # Do not log sensitive details in error messages.
                 return self.request_activation(machine_id)
-                
         except Exception as e:
-            messagebox.showerror("Erreur d'activation", f"Une erreur est survenue: {str(e)}")
+            # Avoid leaking sensitive details in the error message
+            messagebox.showerror("Erreur d'activation", "Une erreur est survenue lors de la validation d'activation.")
             return False
-        
+
     def generate_activation_code(self, machine_id, expiry_date):
-        """Generate an activation code based on machine ID and expiry date."""
-        key = f"{machine_id}|{expiry_date}|TechniFret2025"
-        return hashlib.sha256(key.encode()).hexdigest()[:16]
+        """Generate an activation code using HMAC with a secret salt."""
+        secret_salt = os.environ.get("ACTIVATION_SALT", "DefaultSalt1234")
+        # Use HMAC with SHA256 and return first 16 hex digits.
+        h = hmac.new(secret_salt.encode('utf-8'),
+                     f"{machine_id}|{expiry_date}".encode('utf-8'),
+                     digestmod="sha256")
+        return h.hexdigest()[:16]
         
     def request_activation(self, machine_id):
-        """Show activation dialog and process activation request."""
+        """Show activation dialog and process activation using encrypted storage."""
         activation_dialog = tk.Toplevel(self.root)
         activation_dialog.title("Activation requise")
-        activation_dialog.geometry("500x430")  # Made slightly taller for the new button
+        activation_dialog.geometry("500x430")
         activation_dialog.resizable(False, False)
         activation_dialog.transient(self.root)
         activation_dialog.grab_set()
-        
-        # Styling
         activation_dialog.configure(bg="#f5f5f5")
         
         # Title
@@ -1255,52 +1247,47 @@ Ce logiciel est fourni sous licence et peut être utilisé uniquement conformém
             if not entered_code:
                 messagebox.showwarning("Code manquant", "Veuillez entrer un code d'activation.")
                 return
-                
-            # Format: ACTIVATION-CODE|EXPIRY-DATE
             if '|' not in entered_code:
                 messagebox.showerror("Code invalide", "Le format du code d'activation est invalide.")
                 return
-                
             code_parts = entered_code.split('|')
             if len(code_parts) != 2:
                 messagebox.showerror("Code invalide", "Le format du code d'activation est invalide.")
                 return
-                
             activation_code, expiry_date = code_parts
-            
             try:
-                # Validate expiry date format
                 expiry = datetime.datetime.strptime(expiry_date, "%Y-%m-%d")
-                
-                # Check if already expired
                 if datetime.datetime.now() > expiry:
                     messagebox.showerror("Code expiré", "Ce code d'activation a déjà expiré.")
                     return
-                    
-                # Generate expected code
                 expected_code = self.generate_activation_code(machine_id, expiry_date)
-                
-                # Validate code
                 if activation_code != expected_code:
                     messagebox.showerror("Code invalide", "Le code d'activation est incorrect.")
                     return
-                    
-                # Store activation
-                activation_file = os.path.join(os.path.expanduser("~"), ".filigrane_activation")
-                activation_data = f"{machine_id}|{expiry_date}|{activation_code}"
-                encoded = base64.b64encode(activation_data.encode()).decode('utf-8')
-                
-                with open(activation_file, "w") as f:
-                    f.write(encoded)
-                    
+                # Prepare data to store in an encrypted form
+                activation_data = {
+                    "machine_id": machine_id,
+                    "expiry_date": expiry_date,
+                    "activation_code": activation_code
+                }
+                encrypted = secure_activation.encrypt_activation_data(activation_data)
+                act_file = os.path.join(os.path.expanduser("~"), ".filigrane_activation")
+                with open(act_file, "w") as f:
+                    f.write(encrypted)
+                # Example Windows-specific: make the file hidden.
+                try:
+                    import ctypes
+                    if os.name == 'nt':
+                        FILE_ATTRIBUTE_HIDDEN = 0x02
+                        ctypes.windll.kernel32.SetFileAttributesW(act_file, FILE_ATTRIBUTE_HIDDEN)
+                except:
+                    pass
                 messagebox.showinfo(
                     "Activation réussie", 
                     f"Le logiciel a été activé avec succès jusqu'au {expiry_date}."
                 )
-                
                 response[0] = True
                 activation_dialog.destroy()
-                
             except Exception as e:
                 messagebox.showerror("Erreur", f"Une erreur est survenue: {str(e)}")
         

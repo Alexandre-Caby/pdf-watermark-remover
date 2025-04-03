@@ -31,7 +31,13 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pyinstaller
+        pip install pyarmor
         pip install -r requirements.txt
+    
+    - name: Obfuscate Code with PyArmor
+      run: |
+        # Obfuscate main files recursively and output obfuscated versions to a folder (default "dist_obf")
+        pyarmor obfuscate --recursive remove_watermark.py secure_activation.py
     
     - name: Get version from file
       id: get_version
@@ -51,8 +57,8 @@ jobs:
     
     - name: Build with PyInstaller
       run: |
-        pyinstaller --onefile --windowed --icon=icon_remove_watermark.ico --add-data "version.txt;." remove_watermark.py
-        
+        # Use the obfuscated version of remove_watermark.py as the entry point
+        pyinstaller --onefile --windowed --icon=icon_remove_watermark.ico --add-data "version.txt;." dist_obf/remove_watermark.py
         $version = "${{ steps.get_version.outputs.VERSION }}"
         Rename-Item -Path "dist\remove_watermark.exe" -NewName "Suppression_de_Filigrane_PDF-$version.exe"
         

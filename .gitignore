@@ -27,3 +27,6 @@ Thumbs.db
 # User data
 .filigrane_activation
 .filigrane_terms_accepted
+
+# Environment files
+.env
