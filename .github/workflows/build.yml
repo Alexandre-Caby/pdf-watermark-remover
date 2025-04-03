@@ -1,20 +1,16 @@
 name: Build and Release PDF Watermark Remover
-
 permissions:
   contents: write
   pull-requests: write
-
 on:
   push:
     branches: [ main ]
     tags:
       - 'v*'
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -36,8 +32,29 @@ jobs:
     
     - name: Obfuscate Code with PyArmor
       run: |
-        # Obfuscate main files recursively and output obfuscated versions to a folder (default "dist_obf")
-        pyarmor obfuscate --recursive remove_watermark.py secure_activation.py
+        # Vérifier si les fichiers existent
+        if (Test-Path remove_watermark.py) {
+          echo "File remove_watermark.py exists"
+        } else {
+          echo "File remove_watermark.py does not exist"
+          exit 1
+        }
+        
+        if (Test-Path secure_activation.py) {
+          echo "File secure_activation.py exists"
+        } else {
+          echo "File secure_activation.py does not exist"
+          echo "Skipping obfuscation for this file"
+        }
+        
+        # Obfuscate files
+        pyarmor obfuscate --recursive --output dist_obf remove_watermark.py
+        if (Test-Path secure_activation.py) {
+          pyarmor obfuscate --recursive --output dist_obf secure_activation.py
+        }
+        
+        # List obfuscated files to confirm
+        Get-ChildItem -Path dist_obf -Recurse
     
     - name: Get version from file
       id: get_version
@@ -57,10 +74,26 @@ jobs:
     
     - name: Build with PyInstaller
       run: |
-        # Use the obfuscated version of remove_watermark.py as the entry point
-        pyinstaller --onefile --windowed --icon=icon_remove_watermark.ico --add-data "version.txt;." dist_obf/remove_watermark.py
-        $version = "${{ steps.get_version.outputs.VERSION }}"
-        Rename-Item -Path "dist\remove_watermark.exe" -NewName "Suppression_de_Filigrane_PDF-$version.exe"
+        # S'assurer que le fichier obfusqué existe avant de le compiler
+        if (Test-Path dist_obf/remove_watermark.py) {
+          # Utiliser le fichier obfusqué comme point d'entrée
+          pyinstaller --onefile --windowed --icon=icon_remove_watermark.ico --add-data "version.txt;." dist_obf/remove_watermark.py
+          
+          # Vérifier que l'exécutable a été créé
+          if (Test-Path dist/remove_watermark.exe) {
+            $version = "${{ steps.get_version.outputs.VERSION }}"
+            Rename-Item -Path "dist\remove_watermark.exe" -NewName "Suppression_de_Filigrane_PDF-$version.exe"
+          } else {
+            echo "PyInstaller failed to create the executable"
+            exit 1
+          }
+        } else {
+          echo "Obfuscated file not found, falling back to original file"
+          pyinstaller --onefile --windowed --icon=icon_remove_watermark.ico --add-data "version.txt;." remove_watermark.py
+          
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          Rename-Item -Path "dist\remove_watermark.exe" -NewName "Suppression_de_Filigrane_PDF-$version.exe"
+        }
         
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
