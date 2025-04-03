@@ -1098,16 +1098,16 @@ Ce logiciel est fourni sous licence et peut être utilisé uniquement conformém
                     return self.request_activation(machine_id)
                 return True
             except (json.JSONDecodeError, ValueError, KeyError) as e:
-                # Do not log sensitive details in error messages.
                 return self.request_activation(machine_id)
         except Exception as e:
-            # Avoid leaking sensitive details in the error message
             messagebox.showerror("Erreur d'activation", "Une erreur est survenue lors de la validation d'activation.")
             return False
 
     def generate_activation_code(self, machine_id, expiry_date):
         """Generate an activation code using HMAC with a secret salt."""
-        secret_salt = os.environ.get("ACTIVATION_SALT", "DefaultSalt1234")
+        secret_salt = os.environ.get("ACTIVATION_SALT")
+        if not secret_salt:
+            return False
         # Use HMAC with SHA256 and return first 16 hex digits.
         h = hmac.new(secret_salt.encode('utf-8'),
                      f"{machine_id}|{expiry_date}".encode('utf-8'),
