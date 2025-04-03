@@ -5,11 +5,9 @@ permissions:
 on:
   push:
     branches: [ main ]
-    tags:
-      - 'v*'
   workflow_dispatch:
 jobs:
-  build:
+  build-and-release:
     runs-on: windows-latest
     steps:
     - name: Checkout code
@@ -30,9 +28,29 @@ jobs:
         pip install pyarmor
         pip install -r requirements.txt
     
+    - name: Get version from file
+      id: get_version
+      run: |
+        if (Test-Path version.txt) {
+          $version = Get-Content version.txt
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        } else {
+          echo "VERSION=1.0" >> $env:GITHUB_OUTPUT
+        }
+    
+    - name: Check if tag exists
+      id: check_tag
+      run: |
+        $tagExists = git tag -l "v${{ steps.get_version.outputs.VERSION }}"
+        if ("$tagExists" -eq "v${{ steps.get_version.outputs.VERSION }}") {
+          echo "TAG_EXISTS=true" >> $env:GITHUB_OUTPUT
+        } else {
+          echo "TAG_EXISTS=false" >> $env:GITHUB_OUTPUT
+        }
+    
     - name: Obfuscate Code with PyArmor
       run: |
-        # Vérifier si les fichiers existent
+        # Check if files exist
         if (Test-Path remove_watermark.py) {
           echo "File remove_watermark.py exists"
         } else {
@@ -56,30 +74,14 @@ jobs:
         # List obfuscated files to confirm
         Get-ChildItem -Path dist_obf -Recurse
     
-    - name: Get version from file
-      id: get_version
-      run: |
-        if (Test-Path version.txt) {
-          $version = Get-Content version.txt
-          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
-        } else {
-          echo "VERSION=1.0" >> $env:GITHUB_OUTPUT
-        }
-        
-        if ("${{ github.ref }}".StartsWith('refs/tags/')) {
-          echo "IS_RELEASE=true" >> $env:GITHUB_OUTPUT
-        } else {
-          echo "IS_RELEASE=false" >> $env:GITHUB_OUTPUT
-        }
-    
     - name: Build with PyInstaller
       run: |
-        # S'assurer que le fichier obfusqué existe avant de le compiler
+        # Make sure the obfuscated file exists before compiling
         if (Test-Path dist_obf/remove_watermark.py) {
-          # Utiliser le fichier obfusqué comme point d'entrée
+          # Use the obfuscated file as the entry point
           pyinstaller --onefile --windowed --icon=icon_remove_watermark.ico --add-data "version.txt;." dist_obf/remove_watermark.py
           
-          # Vérifier que l'exécutable a été créé
+          # Verify the executable was created
           if (Test-Path dist/remove_watermark.exe) {
             $version = "${{ steps.get_version.outputs.VERSION }}"
             Rename-Item -Path "dist\remove_watermark.exe" -NewName "Suppression_de_Filigrane_PDF-$version.exe"
@@ -103,11 +105,33 @@ jobs:
           dist/*.exe
         retention-days: 90
     
+    - name: Create and push tag if it doesn't exist
+      if: steps.check_tag.outputs.TAG_EXISTS == 'false'
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git tag -a v${{ steps.get_version.outputs.VERSION }} -m "Version ${{ steps.get_version.outputs.VERSION }}"
+        git push origin v${{ steps.get_version.outputs.VERSION }}
+    
+    - name: Generate changelog if it doesn't exist
+      if: steps.check_tag.outputs.TAG_EXISTS == 'false'
+      run: |
+        if (!(Test-Path CHANGELOG.md)) {
+          echo "# Version ${{ steps.get_version.outputs.VERSION }}" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "## Changes" >> CHANGELOG.md
+          echo "- Updated to version ${{ steps.get_version.outputs.VERSION }}" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "## Known Issues" >> CHANGELOG.md
+          echo "- None" >> CHANGELOG.md
+        }
+    
     - name: Create GitHub Release
-      if: steps.get_version.outputs.IS_RELEASE == 'true'
+      if: steps.check_tag.outputs.TAG_EXISTS == 'false'
       id: create_release
       uses: softprops/action-gh-release@v1
       with:
+        tag_name: v${{ steps.get_version.outputs.VERSION }}
         files: |
           dist/Suppression_de_Filigrane_PDF-${{ steps.get_version.outputs.VERSION }}.exe
         name: Version ${{ steps.get_version.outputs.VERSION }}
@@ -119,7 +143,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Upload build artifacts for development
-      if: steps.get_version.outputs.IS_RELEASE != 'true'
       uses: actions/upload-artifact@v4
       with:
         name: build-artifacts
