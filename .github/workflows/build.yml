@@ -75,26 +75,37 @@ jobs:
         Get-ChildItem -Path dist_obf -Recurse
     
     - name: Build with PyInstaller
+      env:
+        APP_SECRET_KEY: ${{ secrets.ENV_APP_SECRET_KEY }}
+        ACTIVATION_SALT: ${{ secrets.ENV_ACTIVATION_SALT }}
       run: |
+        # Create a temporary environment file that PyInstaller will include
+        echo "APP_SECRET_KEY=$env:APP_SECRET_KEY" > .env
+        echo "ACTIVATION_SALT=$env:ACTIVATION_SALT" >> .env
+        
         # Make sure the obfuscated file exists before compiling
         if (Test-Path dist_obf/remove_watermark.py) {
-          # Use the obfuscated file as the entry point
-          pyinstaller --onefile --windowed --icon=icon_remove_watermark.ico --add-data "version.txt;." dist_obf/remove_watermark.py
+          # Use the obfuscated file as the entry point with environment variables
+          pyinstaller --onefile --windowed --icon=icon_remove_watermark.ico --add-data "version.txt;." --add-data ".env;." dist_obf/remove_watermark.py
           
           # Verify the executable was created
           if (Test-Path dist/remove_watermark.exe) {
             $version = "${{ steps.get_version.outputs.VERSION }}"
             Rename-Item -Path "dist\remove_watermark.exe" -NewName "Suppression_de_Filigrane_PDF-$version.exe"
+            # Clean up the temporary environment file
+            Remove-Item .env -Force
           } else {
             echo "PyInstaller failed to create the executable"
             exit 1
           }
         } else {
           echo "Obfuscated file not found, falling back to original file"
-          pyinstaller --onefile --windowed --icon=icon_remove_watermark.ico --add-data "version.txt;." remove_watermark.py
+          pyinstaller --onefile --windowed --icon=icon_remove_watermark.ico --add-data "version.txt;." --add-data ".env;." remove_watermark.py
           
           $version = "${{ steps.get_version.outputs.VERSION }}"
           Rename-Item -Path "dist\remove_watermark.exe" -NewName "Suppression_de_Filigrane_PDF-$version.exe"
+          # Clean up the temporary environment file
+          Remove-Item .env -Force
         }
         
     - name: Upload build artifacts

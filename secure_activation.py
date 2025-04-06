@@ -8,7 +8,18 @@ import logging
 # Try to load environment variables from .env file
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    # Try to find .env in the PyInstaller bundle
+    import sys
+    import os
+    
+    if getattr(sys, 'frozen', False):
+        # Running as compiled executable
+        bundle_dir = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
+        env_path = os.path.join(bundle_dir, '.env')
+        load_dotenv(env_path)
+    else:
+        # Running in a normal Python environment
+        load_dotenv()
 except ImportError:
     # Silent fail if dotenv is not available in compiled program
     pass
