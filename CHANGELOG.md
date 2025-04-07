@@ -2,6 +2,11 @@
 
 All notable changes to the PDF Watermark Remover will be documented in this file.
 
+## [1.0.4] - 2025-04-07
+
+### Key activation improvements
+- Improved the saving of the license key in the local storage.
+
 ## [1.0.3] - 2025-04-06
 
 ### Fix bugs

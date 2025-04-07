@@ -1264,30 +1264,44 @@ Ce logiciel est fourni sous licence et peut être utilisé uniquement conformém
                 if activation_code != expected_code:
                     messagebox.showerror("Code invalide", "Le code d'activation est incorrect.")
                     return
-                # Prepare data to store in an encrypted form
-                activation_data = {
-                    "machine_id": machine_id,
-                    "expiry_date": expiry_date,
-                    "activation_code": activation_code
-                }
-                encrypted = secure_activation.encrypt_activation_data(activation_data)
-                act_file = os.path.join(os.path.expanduser("~"), ".filigrane_activation")
-                with open(act_file, "w") as f:
-                    f.write(encrypted)
-                # Example Windows-specific: make the file hidden.
                 try:
-                    import ctypes
-                    if os.name == 'nt':
-                        FILE_ATTRIBUTE_HIDDEN = 0x02
-                        ctypes.windll.kernel32.SetFileAttributesW(act_file, FILE_ATTRIBUTE_HIDDEN)
-                except:
-                    pass
-                messagebox.showinfo(
-                    "Activation réussie", 
-                    f"Le logiciel a été activé avec succès jusqu'au {expiry_date}."
-                )
-                response[0] = True
-                activation_dialog.destroy()
+                    # Prepare data to store in an encrypted form
+                    activation_data = {
+                        "machine_id": machine_id,
+                        "expiry_date": expiry_date,
+                        "activation_code": activation_code
+                    }
+                    encrypted = secure_activation.encrypt_activation_data(activation_data)
+                    
+                    # Use a more accessible location
+                    try:
+                        act_file = os.path.join(os.path.expanduser("~"), ".filigrane_activation")
+                        with open(act_file, "w") as f:
+                            f.write(encrypted)
+                        
+                        # Try to make it hidden
+                        try:
+                            import ctypes
+                            if os.name == 'nt':
+                                FILE_ATTRIBUTE_HIDDEN = 0x02
+                                ctypes.windll.kernel32.SetFileAttributesW(act_file, FILE_ATTRIBUTE_HIDDEN)
+                        except:
+                            pass
+                    except PermissionError:
+                        # Fallback to AppData\Local which usually has write permissions
+                        app_data = os.environ.get('LOCALAPPDATA', os.path.expanduser('~'))
+                        act_file = os.path.join(app_data, ".filigrane_activation")
+                        with open(act_file, "w") as f:
+                            f.write(encrypted)
+                    
+                    messagebox.showinfo(
+                        "Activation réussie", 
+                        f"Le logiciel a été activé avec succès jusqu'au {expiry_date}."
+                    )
+                    response[0] = True
+                    activation_dialog.destroy()
+                except Exception as e:
+                    messagebox.showerror("Erreur", f"Une erreur est survenue: {str(e)}")
             except Exception as e:
                 messagebox.showerror("Erreur", f"Une erreur est survenue: {str(e)}")
         
