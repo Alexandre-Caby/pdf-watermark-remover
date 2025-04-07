@@ -1,0 +1,1 @@
+# This module initializes the UI components for the application.

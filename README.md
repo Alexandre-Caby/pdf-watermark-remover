@@ -7,8 +7,10 @@ A desktop application for removing watermarks from PDF documents in a corporate 
 - Remove diagonal watermarks (red text)
 - Remove footer watermarks (blue text)
 - Process individual files or entire folders
-- Works with most standard PDF watermarks
 - Secure activation system
+- **Modular architecture** with separation of UI, core mechanisms, and main application logic
+- External legal documents loaded at runtime (EULA, Terms of Service, etc.)
+- Enhanced build process with obfuscation and updated GitHub workflow
 
 ## Requirements
 
@@ -21,11 +23,11 @@ Download the latest executable from the [Releases](https://github.com/Alexandre-
 
 ## Usage
 
-1. Launch the application
-2. Choose between single file or folder processing
-3. Select source file(s) and destination
-4. Enter watermark parameters if needed
-5. Click "Launch watermark removal"
+1. Launch the application.
+2. Choose between single file or folder processing.
+3. Select source file(s) and destination.
+4. Enter watermark parameters if needed.
+5. Click "Launch watermark removal".
 
 ## Building from Source
 
@@ -33,14 +35,51 @@ Download the latest executable from the [Releases](https://github.com/Alexandre-
 # Install dependencies
 pip install -r requirements.txt
 
-# Run from source
-python remove_watermark.py
+# Run from source using the new entry point
+python run.py
 
-# Build executable with PyInstaller
+# To build an executable with PyInstaller using the new structure:
+# Make sure you have Python 3.9+ for best compatibility with the build scripts.
 pip install pyinstaller
-pyinstaller --onefile --windowed --icon=icon_remove_watermark.ico remove_watermark.py
+pyarmor obfuscate --recursive --output dist_obf run.py
+pyinstaller --onefile --windowed --icon=assets/icons/icon_remove_watermark.ico --add-data "version.txt;." --add-data ".env;." dist_obf/run.py
 ```
+
+## Project Structure
+
+```
+pdf-watermark-remover/
+│
+├── .env
+├── .gitignore
+├── CHANGELOG.md
+├── LICENSE
+├── README.md
+├── requirements.txt
+├── run.py                <-- New entry point
+├── version.txt
+├── .github/
+│   └── workflows/
+│       └── build.yml    <-- Updated build script with obfuscation and tagging support
+├── assets/
+│   ├── icons/
+│   │   └── icon_remove_watermark.ico
+│   └── legal/           <-- External legal documents (EULA.md, Terms_of_Service.md, etc.)
+├── main/
+│   └── remove_watermark.py
+├── mechanisms/
+│   ├── activation_manager.py
+│   ├── auto_updater.py
+│   ├── secure_activation.py
+│   └── watermark_processor.py
+└── ui/
+    ├── app_styles.py
+    ├── app_ui.py
+    └── dialog_windows.py
+```
+
 ## License
-Copyright © 2025 Alexandre Caby. All rights reserved.
+
+© 2025 Alexandre Caby. All rights reserved.
 
 This software is proprietary and confidential. Unauthorized copying, distribution, modification, public display, or public performance of this software is strictly prohibited.

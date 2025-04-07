@@ -1,0 +1,1 @@
+# This is the initialization file for the mechanisms module of the PDF Watermark Remover package.
