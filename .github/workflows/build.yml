@@ -50,7 +50,7 @@ jobs:
     
     - name: Obfuscate Code with PyArmor
       run: |
-        # Check if files exist in new structure
+        # Verify the entry point exists
         if (Test-Path run.py) {
           echo "Entry point run.py exists"
         } else {
@@ -58,6 +58,7 @@ jobs:
           exit 1
         }
         
+        # Ensure the directory structure is correct
         if (Test-Path main/remove_watermark.py) {
           echo "File main/remove_watermark.py exists"
         } else {
@@ -65,19 +66,12 @@ jobs:
           exit 1
         }
         
-        if (Test-Path mechanisms/secure_activation.py) {
-          echo "File mechanisms/secure_activation.py exists"
-        } else {
-          echo "File mechanisms/secure_activation.py does not exist"
-          echo "Skipping obfuscation check for this file"
-        }
-        
         # Obfuscate the entire project recursively from the entry point
         pyarmor obfuscate --recursive --output dist_obf run.py
         
         # List obfuscated files to confirm
         Get-ChildItem -Path dist_obf -Recurse
-    
+
     - name: Build with PyInstaller
       env:
         APP_SECRET_KEY: ${{ secrets.ENV_APP_SECRET_KEY }}
