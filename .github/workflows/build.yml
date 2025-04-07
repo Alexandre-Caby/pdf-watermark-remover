@@ -89,8 +89,22 @@ jobs:
         
         # Make sure the obfuscated file exists before compiling
         if (Test-Path dist_obf/run.py) {
-          # Use the obfuscated file as the entry point with environment variables
-          pyinstaller --onefile --windowed --icon=assets/icons/icon_remove_watermark.ico --add-data "version.txt;." --add-data ".env;." --add-data "main;main" --add-data "mechanisms;mechanisms" --add-data "ui;ui" --add-data "assets;assets" dist_obf/run.py
+          # Use the obfuscated file as the entry point with more explicit module inclusion
+          python -m PyInstaller --onefile --windowed --icon=assets/icons/icon_remove_watermark.ico `
+            --add-data "version.txt;." `
+            --add-data ".env;." `
+            --add-data "main/*;main" `
+            --add-data "mechanisms/*;mechanisms" `
+            --add-data "ui/*;ui" `
+            --add-data "assets/*;assets" `
+            --paths "." `
+            --hidden-import main.remove_watermark `
+            --hidden-import mechanisms.watermark_processor `
+            --hidden-import mechanisms.activation_manager `
+            --hidden-import ui.dialog_windows `
+            --hidden-import ui.app_ui `
+            --hidden-import ui.app_styles `
+            dist_obf/run.py
           
           # Verify the executable was created
           if (Test-Path dist/run.exe) {
@@ -104,7 +118,21 @@ jobs:
           }
         } else {
           echo "Obfuscated file not found, falling back to original file"
-          pyinstaller --onefile --windowed --icon=assets/icons/icon_remove_watermark.ico --add-data "version.txt;." --add-data ".env;." run.py
+          python -m PyInstaller --onefile --windowed --icon=assets/icons/icon_remove_watermark.ico `
+            --add-data "version.txt;." `
+            --add-data ".env;." `
+            --add-data "main/*;main" `
+            --add-data "mechanisms/*;mechanisms" `
+            --add-data "ui/*;ui" `
+            --add-data "assets/*;assets" `
+            --paths "." `
+            --hidden-import main.remove_watermark `
+            --hidden-import mechanisms.watermark_processor `
+            --hidden-import mechanisms.activation_manager `
+            --hidden-import ui.dialog_windows `
+            --hidden-import ui.app_ui `
+            --hidden-import ui.app_styles `
+            run.py
           
           $version = "${{ steps.get_version.outputs.VERSION }}"
           Rename-Item -Path "dist\run.exe" -NewName "Suppression_de_Filigrane_PDF-$version.exe"
