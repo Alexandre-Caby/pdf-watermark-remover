@@ -6,6 +6,11 @@ import os
 import sys
 import tkinter as tk
 
+if getattr(sys, 'frozen', False):
+    sys.path.insert(0, sys._MEIPASS)
+else:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 # Import the main application
 from main.remove_watermark import WatermarkRemoverApp
 
