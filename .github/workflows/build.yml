@@ -114,6 +114,7 @@ jobs:
         python -m PyInstaller --onefile --windowed --icon=assets/icons/icon_remove_watermark.ico `
           --add-data "version.txt;." `
           --add-data ".env;." `
+          --add-data "assets/icons/icon_remove_watermark.ico;." `
           --add-data "assets/*;assets" `
           --paths="dist_obf" `
           dist_obf/run.py
