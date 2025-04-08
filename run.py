@@ -42,21 +42,31 @@ try:
         # Set application icon
         try:
             if getattr(sys, 'frozen', False):
-                # When frozen, look for icon in the root of MEIPASS or in assets folder
-                icon_path = os.path.join(sys._MEIPASS, "assets", "icons", "icon_remove_watermark.ico")
-                if not os.path.exists(icon_path):
-                    # Try alternate location
-                    icon_path = os.path.join(sys._MEIPASS, "icon_remove_watermark.ico")
+                # Chercher l'icône dans différents emplacements possibles
+                possible_icon_paths = [
+                    os.path.join(sys._MEIPASS, "assets", "icons", "icon_remove_watermark.ico"),
+                    os.path.join(sys._MEIPASS, "icon_remove_watermark.ico"),
+                    os.path.join(os.path.dirname(sys.executable), "assets", "icons", "icon_remove_watermark.ico"),
+                    os.path.join(os.path.dirname(sys.executable), "icon_remove_watermark.ico")
+                ]
+                
+                icon_found = False
+                for icon_path in possible_icon_paths:
+                    if os.path.exists(icon_path):
+                        root.iconbitmap(icon_path)
+                        log_message(f"Loaded icon from: {icon_path}")
+                        icon_found = True
+                        break
+                
+                if not icon_found:
+                    log_message(f"Icon not found in any of these locations: {possible_icon_paths}")
             else:
                 # When running from source
                 icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
-                                      "assets", "icons", "icon_remove_watermark.ico")
-            
-            if os.path.exists(icon_path):
-                root.iconbitmap(icon_path)
+                                    "assets", "icons", "icon_remove_watermark.ico")
+                if os.path.exists(icon_path):
+                    root.iconbitmap(icon_path)
                 log_message(f"Loaded icon from: {icon_path}")
-            else:
-                log_message(f"Icon not found at: {icon_path}")
         except Exception as e:
             log_message(f"Could not load icon: {e}")
             # Continue without icon
