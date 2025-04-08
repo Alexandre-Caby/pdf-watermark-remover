@@ -239,26 +239,19 @@ class ActivationManager:
                     }
                     encrypted = secure_activation.encrypt_activation_data(activation_data)
                     
-                    # Use a more accessible location
+                    # Use self.activation_file for consistency
+                    act_file = self.activation_file
+                    with open(act_file, "w") as f:
+                        f.write(encrypted)
+                    
+                    # Optionally, try to make it hidden (Windows example)
                     try:
-                        act_file = os.path.join(os.path.expanduser("~"), ".filigrane_activation")
-                        with open(act_file, "w") as f:
-                            f.write(encrypted)
-                        
-                        # Try to make it hidden
-                        try:
-                            import ctypes
-                            if os.name == 'nt':
-                                FILE_ATTRIBUTE_HIDDEN = 0x02
-                                ctypes.windll.kernel32.SetFileAttributesW(act_file, FILE_ATTRIBUTE_HIDDEN)
-                        except:
-                            pass
-                    except PermissionError:
-                        # Fallback to AppData\Local which usually has write permissions
-                        app_data = os.environ.get('LOCALAPPDATA', os.path.expanduser('~'))
-                        act_file = os.path.join(app_data, ".filigrane_activation")
-                        with open(act_file, "w") as f:
-                            f.write(encrypted)
+                        import ctypes
+                        if os.name == 'nt':
+                            FILE_ATTRIBUTE_HIDDEN = 0x02
+                            ctypes.windll.kernel32.SetFileAttributesW(act_file, FILE_ATTRIBUTE_HIDDEN)
+                    except:
+                        pass
                     
                     messagebox.showinfo(
                         "Activation réussie", 
@@ -270,7 +263,7 @@ class ActivationManager:
                     messagebox.showerror("Erreur", f"Une erreur est survenue: {str(e)}")
             except Exception as e:
                 messagebox.showerror("Erreur", f"Une erreur est survenue: {str(e)}")
-        
+
         def on_cancel():
             response[0] = False
             activation_dialog.destroy()
