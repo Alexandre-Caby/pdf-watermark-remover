@@ -20,23 +20,34 @@ class ActivationManager:
     def __init__(self, root):
         """Initialize with root window."""
         self.root = root
+        # Determine the best location for activation file
+        if os.name == 'nt':  # Windows
+            self.activation_file = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 
+                                            "PDFWatermarkRemover", ".filigrane_activation")
+        else:  # macOS/Linux
+            self.activation_file = os.path.join(os.path.expanduser('~'), 
+                                            ".config", "pdfwatermarkremover", ".filigrane_activation")
+        
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(self.activation_file), exist_ok=True)
     
     def validate_activation(self):
         """Validate if the software is activated using encrypted activation data."""
         try:
             machine_id = str(uuid.getnode())
-            activation_file = os.path.join(os.path.expanduser("~"), ".filigrane_activation")
-            if not os.path.exists(activation_file):
+
+            if not os.path.exists(self.activation_file):
                 return self.request_activation(machine_id)
+            
             try:
-                with open(activation_file, "r") as f:
+                with open(self.activation_file, "r") as f:
                     encrypted_data = f.read().strip()
                 # Decrypt the activation data
                 data = secure_activation.decrypt_activation_data(encrypted_data)
                 stored_machine_id = data.get("machine_id", "")
                 expiry_date = data.get("expiry_date", "")
                 activation_code = data.get("activation_code", "")
-                
+                                
                 if stored_machine_id != machine_id:
                     return self.request_activation(machine_id)
                     
@@ -53,12 +64,12 @@ class ActivationManager:
                 if not hmac.compare_digest(activation_code, expected_code):
                     return self.request_activation(machine_id)
                 return True
-            except (json.JSONDecodeError, ValueError, KeyError) as e:
+            except Exception as e:
                 return self.request_activation(machine_id)
         except Exception as e:
             messagebox.showerror("Erreur d'activation", "Une erreur est survenue lors de la validation d'activation.")
             return False
-
+        
     def generate_activation_code(self, machine_id, expiry_date):
         """Generate an activation code using HMAC with a secret salt."""
         secret_salt = os.environ.get("ACTIVATION_SALT")
