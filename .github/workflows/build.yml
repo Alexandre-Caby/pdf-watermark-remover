@@ -92,16 +92,30 @@ jobs:
         echo "APP_SECRET_KEY=$env:APP_SECRET_KEY" > .env
         echo "ACTIVATION_SALT=$env:ACTIVATION_SALT" >> .env
         
-        # Copy all Python files to the root of dist_obf to make imports simpler
-        Get-ChildItem -Path main -Filter *.py | Copy-Item -Destination dist_obf
-        Get-ChildItem -Path mechanisms -Filter *.py | Copy-Item -Destination dist_obf
-        Get-ChildItem -Path ui -Filter *.py | Copy-Item -Destination dist_obf
+        # Create a flattened structure for PyInstaller
+        Copy-Item main/*.py dist_obf/
+        Copy-Item mechanisms/*.py dist_obf/
+        Copy-Item ui/*.py dist_obf/
         
-        # Use a simpler PyInstaller command
+        # Modify the import in dist_obf/run.py to use direct import
+        $runContent = Get-Content dist_obf/run.py
+        $modifiedContent = $runContent -replace 'from main.remove_watermark import WatermarkRemoverApp', 'from remove_watermark import WatermarkRemoverApp'
+        $modifiedContent | Set-Content dist_obf/run.py
+        
+        # Debug: List the files in dist_obf directory
+        Write-Host "Files in dist_obf directory:"
+        Get-ChildItem -Path dist_obf -Recurse | Format-Table Name, Length
+        
+        # Show the run.py content before PyInstaller
+        Write-Host "run.py content before PyInstaller:"
+        Get-Content dist_obf/run.py | Select-String "WatermarkRemoverApp"
+        
+        # Use PyInstaller with --paths to tell it where to look for modules
         python -m PyInstaller --onefile --windowed --icon=assets/icons/icon_remove_watermark.ico `
           --add-data "version.txt;." `
           --add-data ".env;." `
           --add-data "assets/*;assets" `
+          --paths="dist_obf" `
           dist_obf/run.py
         
         # Verify the executable was created
