@@ -66,8 +66,19 @@ jobs:
           exit 1
         }
         
+        # Create dist_obf directory if it doesn't exist
+        New-Item -Path dist_obf -ItemType Directory -Force
+        
         # Obfuscate the entire project recursively from the entry point
         pyarmor obfuscate --recursive --output dist_obf run.py
+        
+        # Explicitly check if run.py was obfuscated
+        if (Test-Path dist_obf/run.py) {
+          echo "run.py was successfully obfuscated"
+        } else {
+          echo "run.py was not found in dist_obf, copying original file"
+          Copy-Item run.py -Destination dist_obf/
+        }
         
         # List obfuscated files to confirm
         Get-ChildItem -Path dist_obf -Recurse
