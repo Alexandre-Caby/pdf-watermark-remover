@@ -50,7 +50,6 @@ pyinstaller --onefile --windowed --icon=assets/icons/icon_remove_watermark.ico -
 ```
 pdf-watermark-remover/
 │
-├── .env
 ├── .gitignore
 ├── CHANGELOG.md
 ├── LICENSE
