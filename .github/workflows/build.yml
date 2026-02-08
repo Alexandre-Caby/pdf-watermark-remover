@@ -47,6 +47,35 @@ jobs:
         } else {
           echo "TAG_EXISTS=false" >> $env:GITHUB_OUTPUT
         }
+
+    - name: Generate secrets module (XOR-obfuscated)
+      env:
+        APP_SECRET_KEY: ${{ secrets.ENV_APP_SECRET_KEY }}
+        ACTIVATION_SALT: ${{ secrets.ENV_ACTIVATION_SALT }}
+      run: |
+        python -c @"
+        import os, secrets as sec
+        key = sec.token_bytes(32)
+        def xor_encode(value, k):
+            data = value.encode('utf-8')
+            return bytes(b ^ k[i % len(k)] for i, b in enumerate(data))
+        app_key = os.environ['APP_SECRET_KEY']
+        salt = os.environ['ACTIVATION_SALT']
+        enc_app = xor_encode(app_key, key)
+        enc_salt = xor_encode(salt, key)
+        with open('mechanisms/_secrets.py', 'w') as f:
+            f.write('\"\"\"Auto-generated secrets (XOR-obfuscated). Do not edit.\"\"\"\\n\\n')
+            f.write(f'_K = {key!r}\\n\\n')
+            f.write('def _xor_decode(data, key):\\n')
+            f.write('    return bytes(b ^ key[i % len(key)] for i, b in enumerate(data)).decode(\"utf-8\")\\n\\n')
+            f.write(f'_ENC_APP_KEY = {enc_app!r}\\n')
+            f.write(f'_ENC_SALT = {enc_salt!r}\\n\\n')
+            f.write('def get_app_secret_key():\\n')
+            f.write('    return _xor_decode(_ENC_APP_KEY, _K)\\n\\n')
+            f.write('def get_activation_salt():\\n')
+            f.write('    return _xor_decode(_ENC_SALT, _K)\\n')
+        print('Secrets module generated successfully')
+        "@
     
     - name: Obfuscate Code with PyArmor
       run: |
@@ -73,14 +102,7 @@ jobs:
         Get-ChildItem -Path dist_obf -Recurse
 
     - name: Build with PyInstaller
-      env:
-        APP_SECRET_KEY: ${{ secrets.ENV_APP_SECRET_KEY }}
-        ACTIVATION_SALT: ${{ secrets.ENV_ACTIVATION_SALT }}
       run: |
-        # Create a temporary environment file that PyInstaller will include
-        echo "APP_SECRET_KEY=$env:APP_SECRET_KEY" > .env
-        echo "ACTIVATION_SALT=$env:ACTIVATION_SALT" >> .env
-        
         # Copy all Python files to the root of dist_obf to make imports simpler
         Get-ChildItem -Path main -Filter *.py | Copy-Item -Destination dist_obf
         Get-ChildItem -Path mechanisms -Filter *.py | Copy-Item -Destination dist_obf
@@ -89,7 +111,9 @@ jobs:
         # Use a simpler PyInstaller command
         python -m PyInstaller --onefile --windowed --icon=assets/icons/icon_remove_watermark.ico `
           --add-data "version.txt;." `
-          --add-data ".env;." `
+          --add-data "locales;locales" `
+          --add-data "admin_contact.json;." `
+          --add-data "revocation_list.json;." `
           --add-data "assets/*;assets" `
           dist_obf/run.py
         
@@ -97,12 +121,19 @@ jobs:
         if (Test-Path dist/run.exe) {
           $version = "${{ steps.get_version.outputs.VERSION }}"
           Rename-Item -Path "dist\run.exe" -NewName "Suppression_de_Filigrane_PDF-$version.exe"
-          # Clean up the temporary environment file
-          Remove-Item .env -Force
         } else {
           echo "PyInstaller failed to create the executable"
           exit 1
         }
+
+    - name: Compute SHA-256 checksum
+      id: checksum
+      run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+        $exePath = "dist\Suppression_de_Filigrane_PDF-$version.exe"
+        $hash = (Get-FileHash -Path $exePath -Algorithm SHA256).Hash
+        echo "SHA256=$hash" >> $env:GITHUB_OUTPUT
+        echo "SHA256: $hash"
         
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
@@ -120,18 +151,18 @@ jobs:
         git tag -a v${{ steps.get_version.outputs.VERSION }} -m "Version ${{ steps.get_version.outputs.VERSION }}"
         git push origin v${{ steps.get_version.outputs.VERSION }}
     
-    - name: Generate changelog if it doesn't exist
+    - name: Prepare release body
       if: steps.check_tag.outputs.TAG_EXISTS == 'false'
       run: |
-        if (!(Test-Path CHANGELOG.md)) {
-          echo "# Version ${{ steps.get_version.outputs.VERSION }}" > CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "## Changes" >> CHANGELOG.md
-          echo "- Updated to version ${{ steps.get_version.outputs.VERSION }}" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "## Known Issues" >> CHANGELOG.md
-          echo "- None" >> CHANGELOG.md
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+        $sha256  = "${{ steps.checksum.outputs.SHA256 }}"
+        if (Test-Path CHANGELOG.md) {
+          $body = Get-Content CHANGELOG.md -Raw
+        } else {
+          $body = "# Version $version`n`n## Changes`n- Updated to version $version"
         }
+        $body += "`n`n---`nSHA256: $sha256"
+        Set-Content -Path release_body.md -Value $body
     
     - name: Create GitHub Release
       if: steps.check_tag.outputs.TAG_EXISTS == 'false'
@@ -142,7 +173,7 @@ jobs:
         files: |
           dist/Suppression_de_Filigrane_PDF-${{ steps.get_version.outputs.VERSION }}.exe
         name: Version ${{ steps.get_version.outputs.VERSION }}
-        body_path: CHANGELOG.md
+        body_path: release_body.md
         draft: false
         prerelease: false
         fail_on_unmatched_files: false

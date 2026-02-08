@@ -1,31 +1,31 @@
-# COPYRIGHT NOTICE
+# AVIS DE DROIT D'AUTEUR
 
-© 2025 Alexandre Caby. All Rights Reserved.
+© 2025 Alexandre Caby. Tous droits réservés selon les termes de la GPL-3.0.
 
-## PROPRIETARY SOFTWARE
+## LOGICIEL LIBRE
 
-"Suppression de Filigrane PDF" is proprietary software owned exclusively by Alexandre Caby. The software is protected by copyright laws and international copyright treaties, as well as other intellectual property laws and treaties.
+« Suppression de Filigrane PDF » est un logiciel libre distribué sous la licence GNU General Public License version 3 (GPL-3.0). Le code source est disponible publiquement sur GitHub.
 
-## RESTRICTIONS
+## DROITS ET LIBERTÉS
 
-Unauthorized reproduction or distribution of this program, or any portion of it, may result in severe civil and criminal penalties, and will be prosecuted to the maximum extent possible under law.
+Conformément à la GPL-3.0, vous êtes libre de :
+- Utiliser le Logiciel à toute fin.
+- Étudier et modifier le code source.
+- Redistribuer des copies du Logiciel.
+- Distribuer vos versions modifiées.
 
-## AUTHORIZED USE
+Toute redistribution doit se faire sous les mêmes termes GPL-3.0.
 
-This software is made available to authorized users within TechniFret/SNCF under license. The software may only be used in accordance with the terms and conditions of the End User License Agreement (EULA).
+## UTILISATION AUTORISÉE
 
-## NO TRANSFER OF OWNERSHIP
+Ce logiciel est mis à disposition des utilisateurs au sein de TechniFret/SNCF et de toute personne souhaitant l'utiliser conformément à la GPL-3.0.
 
-The license to use this software does not constitute a transfer of ownership. All rights, title, and interest in the software remain with Alexandre Caby.
+## ATTRIBUTIONS
 
-## NOTICES PRESERVATION
-
-All copyright notices, proprietary markings, and attributions must be preserved in all copies or portions of the software.
+L'auteur original du logiciel est Alexandre Caby. Les mentions de droit d'auteur et d'attribution doivent être conservées dans toutes les copies ou portions du logiciel, conformément à la GPL-3.0.
 
 ## CONTACT
 
-For information regarding licensing, please contact:
+Pour toute question concernant le logiciel :
 - Alexandre Caby
-- Email: alexandre.caby@sncf.fr
-
-This notice supersedes any conflicting or additional terms contained in any communications with respect to the software.
+- Dépôt GitHub : https://github.com/Alexandre-Caby/pdf-watermark-remover

@@ -1,20 +1,45 @@
 """
-PDF Watermark Processing Module
-Handles all PDF-related operations including watermark removal.
+PDF Watermark Processing Module.
+
+Handles all PDF-related operations including watermark detection
+and removal across single files and batch folder processing.
 """
 
-import fitz  # PyMuPDF
+import logging
 import os
 import shutil
 import tempfile
 import time
+from typing import Optional
+
+import fitz  # PyMuPDF
 from tkinter import messagebox
+
+logger = logging.getLogger("watermark_app.processor")
 
 class WatermarkProcessor:
     """Handles PDF watermark removal functionality."""
     
-    def remove_watermark_by_structure(self, pdf_path, output_path, name_pattern, 
-                                     footer_pattern="DOCUMENT NON APPLICABLE", progress_var=None):
+    def remove_watermark_by_structure(
+        self,
+        pdf_path: str,
+        output_path: str,
+        name_pattern: str,
+        footer_pattern: str = "DOCUMENT NON APPLICABLE",
+        progress_var: Optional["tk.IntVar"] = None,
+    ) -> bool:
+        """Remove watermarks from a single PDF by analysing its content streams.
+
+        Args:
+            pdf_path: Path to the source PDF file.
+            output_path: Path where the processed PDF will be saved.
+            name_pattern: Name text to search for in diagonal (red) watermarks.
+            footer_pattern: Footer text to remove (blue watermark).
+            progress_var: Optional Tkinter IntVar updated with 0-100 progress.
+
+        Returns:
+            True on success, False on failure.
+        """
         """Remove watermarks by analyzing the PDF structure."""
         try:
             # Create temporary file
@@ -146,8 +171,8 @@ class WatermarkProcessor:
                 shutil.copy2(temp_file, output_path)
                 try:
                     os.remove(temp_file)
-                except:
-                    pass
+                except OSError as rm_err:
+                    logger.warning("Could not remove temp file %s: %s", temp_file, rm_err)
 
                 # Add a subtle identification to the processed file
                 try:
@@ -157,66 +182,107 @@ class WatermarkProcessor:
                         page.insert_text((5, 5), text, fontsize=4, color=(0.9, 0.9, 0.9))
                     output_doc.save(output_path, garbage=4, deflate=True, clean=True)
                     output_doc.close()
-                except:
-                    pass  # Continue even if watermark can't be added
+                except Exception as wm_err:
+                    logger.warning("Could not add identification watermark: %s", wm_err)
                 return True
-            except Exception as e:
-                messagebox.showwarning("Attention", 
-                    f"Impossible d'écrire dans {output_path}.\nLe fichier traité est disponible dans: {temp_file}")
+            except Exception as copy_err:
+                logger.error("Failed to write output to %s: %s", output_path, copy_err)
+                messagebox.showwarning(
+                    "Attention",
+                    f"Impossible d'écrire dans {output_path}.\n"
+                    f"Le fichier traité est disponible dans: {temp_file}",
+                )
                 return False
-                
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors du traitement de {pdf_path}: {str(e)}")
+
+        except Exception as proc_err:
+            logger.error("Error processing %s: %s", pdf_path, proc_err, exc_info=True)
+            messagebox.showerror(
+                "Erreur", f"Erreur lors du traitement de {pdf_path}: {proc_err}"
+            )
             return False
     
-    def process_folder(self, input_folder, output_folder, name_pattern, 
-                      footer_pattern="DOCUMENT NON APPLICABLE", progress_var=None, status_var=None):
-        """Process all PDF files in a folder."""
+    def process_folder(
+        self,
+        input_folder: str,
+        output_folder: str,
+        name_pattern: str,
+        footer_pattern: str = "DOCUMENT NON APPLICABLE",
+        progress_var: Optional["tk.IntVar"] = None,
+        status_var: Optional["tk.StringVar"] = None,
+    ) -> bool:
+        """Process all PDF files in a folder.
+
+        Unlike previous behaviour that stopped on the first failure,
+        this now processes every file and reports a summary at the end.
+
+        Returns:
+            True if *all* files succeeded, False if at least one failed.
+        """
         try:
             # Create destination folder if it doesn't exist
             if not os.path.exists(output_folder):
                 try:
                     os.makedirs(output_folder)
-                except:
-                    messagebox.showerror("Erreur", f"Impossible de créer le dossier de destination: {output_folder}")
+                except OSError as dir_err:
+                    logger.error("Cannot create output folder %s: %s", output_folder, dir_err)
+                    messagebox.showerror(
+                        "Erreur",
+                        f"Impossible de créer le dossier de destination: {output_folder}",
+                    )
                     return False
-            
+
             # Get all PDF files in source folder
             pdf_files = [f for f in os.listdir(input_folder) if f.lower().endswith(".pdf")]
             total_files = len(pdf_files)
-            
+
             if total_files == 0:
                 if status_var:
                     status_var.set("Aucun fichier PDF trouvé dans le dossier source.")
                 return False
-            
-            # Process each PDF file
+
+            failed_files: list[str] = []
+
+            # Process each PDF file — continue on individual failures
             for i, filename in enumerate(pdf_files):
                 input_path = os.path.join(input_folder, filename)
                 output_path = os.path.join(output_folder, filename)
-                
-                # Update status
+
                 if status_var:
-                    status_var.set(f"Traitement de {filename} ({i+1}/{total_files})")
-                
-                # Process the file
-                success = self.remove_watermark_by_structure(input_path, output_path, name_pattern, footer_pattern)
-                
-                # Update overall progress
+                    status_var.set(f"Traitement de {filename} ({i + 1}/{total_files})")
+
+                success = self.remove_watermark_by_structure(
+                    input_path, output_path, name_pattern, footer_pattern
+                )
+
                 if progress_var is not None:
                     progress_var.set(int((i + 1) / total_files * 100))
-                
+
                 if not success:
-                    if status_var:
-                        status_var.set(f"Erreur lors du traitement de {filename}")
-                    return False
-            
+                    failed_files.append(filename)
+                    logger.warning("Failed to process: %s", filename)
+
+            # Summary
+            succeeded = total_files - len(failed_files)
+            if failed_files:
+                if status_var:
+                    status_var.set(
+                        f"Terminé : {succeeded}/{total_files} fichiers traités. "
+                        f"{len(failed_files)} erreur(s)."
+                    )
+                messagebox.showwarning(
+                    "Traitement partiel",
+                    f"{len(failed_files)} fichier(s) n'ont pas pu être traités :\n"
+                    + "\n".join(f"• {f}" for f in failed_files[:10]),
+                )
+                return False
+
             if status_var:
                 status_var.set(f"Traitement terminé. {total_files} fichiers traités.")
             return True
-            
-        except Exception as e:
+
+        except Exception as exc:
+            logger.error("Batch processing error: %s", exc, exc_info=True)
             if status_var:
-                status_var.set(f"Erreur: {str(e)}")
-            messagebox.showerror("Erreur", f"Une erreur est survenue: {str(e)}")
+                status_var.set(f"Erreur: {exc}")
+            messagebox.showerror("Erreur", f"Une erreur est survenue: {exc}")
             return False

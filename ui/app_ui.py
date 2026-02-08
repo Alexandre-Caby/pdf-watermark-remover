@@ -1,333 +1,409 @@
 """
-Application UI Module
-Contains UI components and handlers for the application.
+Application UI Module – modern CustomTkinter interface.
+
+Provides all main-window widgets: mode switch, source / destination
+pickers, watermark parameter card, action button, and progress bar.
 """
 
 import os
-import tkinter as tk
-from tkinter import filedialog, ttk, messagebox
 import time
 import threading
+import tkinter as tk
+from tkinter import filedialog, messagebox
+
+import customtkinter as ctk
+
 
 class AppUI:
-    """UI components for PDF Watermark Remover."""
-    
-    def __init__(self, root, watermark_processor):
-        """Initialize UI with root window and watermark processor."""
+    """Modern UI components for PDF Watermark Remover."""
+
+    def __init__(self, root: ctk.CTk, watermark_processor) -> None:
+        """Initialise UI with the root window and watermark processor."""
         self.root = root
         self.watermark_processor = watermark_processor
+        # Callbacks — set after construction via setters
+        self.show_help_callback = None
+        self.show_about_callback = None
+        self.check_updates_callback = None
         self.init_variables()
-    
-    def init_variables(self):
-        """Initialize all tkinter variables."""
+
+    # ── Variables ──────────────────────────────────────────────────
+
+    def init_variables(self) -> None:
+        """Initialise all tkinter variables."""
         self.input_var = tk.StringVar()
         self.output_var = tk.StringVar()
-        self.name_var = tk.StringVar(value="")  # No default name
+        self.name_var = tk.StringVar(value="")
         self.footer_var = tk.StringVar(value="DOCUMENT NON APPLICABLE")
         self.progress_var = tk.IntVar()
         self.status_var = tk.StringVar()
         self.file_mode_var = tk.BooleanVar(value=False)
-        self.use_footer_var = tk.BooleanVar(value=True)  # Checked by default
-    
-    def create_ui(self):
-        """Create the complete user interface."""
-        # Main container
-        self.main_frame = ttk.Frame(self.root, padding="20")
-        self.main_frame.pack(fill='both', expand=True)
-        
-        # Add UI sections
-        self.create_mode_section()
-        self.create_input_section()
-        self.create_output_section()
-        self.create_parameters_section()
-        self.create_action_section()
-        self.create_progress_section()
+        self.use_footer_var = tk.BooleanVar(value=True)
+
+        # Bridge IntVar(0-100) → CTkProgressBar(0.0-1.0)
+        self.progress_var.trace_add("write", self._on_progress_changed)
+
+    def _on_progress_changed(self, *_args) -> None:
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.set(
+                max(0.0, min(1.0, self.progress_var.get() / 100.0))
+            )
+
+    # ── UI assembly ───────────────────────────────────────────────
+
+    def create_ui(self) -> None:
+        """Build the complete user interface."""
+        # Scrollable container for the whole window
+        self.main_frame = ctk.CTkScrollableFrame(self.root, corner_radius=0)
+        self.main_frame.pack(fill="both", expand=True, padx=0, pady=0)
+
+        self._create_header()
+
+        # Central content pane
+        content = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        content.pack(fill="both", expand=True, padx=24, pady=(0, 24))
+
+        self._create_mode_section(content)
+        self._create_io_section(content)
+        self._create_parameters_section(content)
+        self._create_action_section(content)
+        self._create_progress_section(content)
         self.create_menu_bar()
-        
-        # Set initial states
+
+        # Apply initial state
         self.toggle_footer_options()
-    
-    def create_mode_section(self):
-        """Create the file mode selection section."""
-        mode_frame = ttk.Frame(self.main_frame)
-        mode_frame.pack(fill='x', pady=(0, 10))
-        
-        # File mode checkbox
-        ttk.Checkbutton(
-            mode_frame, 
-            text="Traiter un seul fichier PDF", 
-            variable=self.file_mode_var, 
-            command=self.toggle_file_mode
-        ).pack(side='left')
-        
-        # Help button
-        help_button = ttk.Button(
-            mode_frame, 
-            text="?", 
-            width=3, 
-            command=self.show_help_callback if hasattr(self, 'show_help_callback') else None, 
-            style='Help.TButton'
+
+    # ── Header ────────────────────────────────────────────────────
+
+    def _create_header(self) -> None:
+        header = ctk.CTkFrame(
+            self.main_frame, corner_radius=0, height=56,
+            fg_color=("gray92", "gray14"),
         )
-        help_button.pack(side='right')
-    
-    def create_input_section(self):
-        """Create the input selection section."""
-        ttk.Label(self.main_frame, text="Source :").pack(anchor='w', pady=(0, 5))
-        
-        input_frame = ttk.Frame(self.main_frame)
-        input_frame.pack(fill='x', pady=(0, 15))
-        
-        ttk.Entry(
-            input_frame, 
-            textvariable=self.input_var, 
-            width=50
-        ).pack(side='left', expand=True, fill='x')
-        
-        self.input_button = ttk.Button(
-            input_frame, 
-            text="Parcourir", 
-            command=self.select_input
+        header.pack(fill="x")
+        header.pack_propagate(False)
+
+        ctk.CTkLabel(
+            header,
+            text="  Suppression de Filigrane PDF",
+            font=ctk.CTkFont(size=18, weight="bold"),
+        ).pack(side="left", padx=16)
+
+        ctk.CTkButton(
+            header, text="?", width=36, height=36,
+            corner_radius=18,
+            font=ctk.CTkFont(size=16, weight="bold"),
+            command=lambda: (
+                self.show_help_callback() if self.show_help_callback else None
+            ),
+        ).pack(side="right", padx=16)
+
+    # ── Mode switch ───────────────────────────────────────────────
+
+    def _create_mode_section(self, parent: ctk.CTkFrame) -> None:
+        card = ctk.CTkFrame(parent, corner_radius=10)
+        card.pack(fill="x", pady=(16, 0))
+
+        ctk.CTkSwitch(
+            card,
+            text="  Traiter un seul fichier PDF",
+            variable=self.file_mode_var,
+            command=self.toggle_file_mode,
+            onvalue=True, offvalue=False,
+        ).pack(padx=16, pady=14, anchor="w")
+
+    # ── Source / Destination ──────────────────────────────────────
+
+    def _create_io_section(self, parent: ctk.CTkFrame) -> None:
+        # Source
+        ctk.CTkLabel(
+            parent, text="Source",
+            font=ctk.CTkFont(size=13, weight="bold"),
+        ).pack(anchor="w", pady=(16, 4))
+
+        src = ctk.CTkFrame(parent, fg_color="transparent")
+        src.pack(fill="x")
+
+        ctk.CTkEntry(
+            src, textvariable=self.input_var,
+            placeholder_text="Sélectionnez un dossier ou fichier PDF…",
+        ).pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        self.input_button = ctk.CTkButton(
+            src, text="Parcourir", width=110,
+            command=self.select_input,
         )
-        self.input_button.pack(side='right', padx=(5, 0))
-    
-    def create_output_section(self):
-        """Create the output destination section."""
-        ttk.Label(self.main_frame, text="Destination :").pack(anchor='w', pady=(0, 5))
-        
-        output_frame = ttk.Frame(self.main_frame)
-        output_frame.pack(fill='x', pady=(0, 15))
-        
-        ttk.Entry(
-            output_frame, 
-            textvariable=self.output_var, 
-            width=50
-        ).pack(side='left', expand=True, fill='x')
-        
-        ttk.Button(
-            output_frame, 
-            text="Parcourir", 
-            command=self.select_output
-        ).pack(side='right', padx=(5, 0))
-    
-    def create_parameters_section(self):
-        """Create the watermark parameters section."""
-        params_frame = ttk.LabelFrame(self.main_frame, text="Paramètres des filigranes")
-        params_frame.pack(fill='x', pady=(0, 15))
-        
-        # Name watermark (red diagonal)
-        ttk.Label(
-            params_frame, 
-            text="Nom dans le filigrane diagonal (rouge) :"
-        ).pack(anchor='w', pady=(5, 5), padx=10)
-        
-        ttk.Entry(
-            params_frame, 
-            textvariable=self.name_var, 
-            width=50
-        ).pack(fill='x', pady=(0, 10), padx=10)
-        
-        # Footer watermark (blue text)
-        footer_frame = ttk.Frame(params_frame)
-        footer_frame.pack(fill='x', pady=(0, 10), padx=10)
-        
-        ttk.Checkbutton(
-            footer_frame, 
-            text="Utiliser le filigrane de pied de page (bleu) :", 
-            variable=self.use_footer_var, 
-            command=self.toggle_footer_options
-        ).pack(anchor='w')
-        
-        self.footer_entry = ttk.Entry(
-            params_frame, 
-            textvariable=self.footer_var, 
-            width=50
+        self.input_button.pack(side="right")
+
+        # Destination
+        ctk.CTkLabel(
+            parent, text="Destination",
+            font=ctk.CTkFont(size=13, weight="bold"),
+        ).pack(anchor="w", pady=(14, 4))
+
+        dst = ctk.CTkFrame(parent, fg_color="transparent")
+        dst.pack(fill="x")
+
+        ctk.CTkEntry(
+            dst, textvariable=self.output_var,
+            placeholder_text="Sélectionnez un dossier de destination…",
+        ).pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        ctk.CTkButton(
+            dst, text="Parcourir", width=110,
+            command=self.select_output,
+        ).pack(side="right")
+
+    # ── Watermark parameters card ─────────────────────────────────
+
+    def _create_parameters_section(self, parent: ctk.CTkFrame) -> None:
+        card = ctk.CTkFrame(parent, corner_radius=10)
+        card.pack(fill="x", pady=(16, 0))
+
+        ctk.CTkLabel(
+            card, text="Paramètres des filigranes",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(anchor="w", padx=16, pady=(14, 6))
+
+        # Diagonal name
+        ctk.CTkLabel(
+            card, text="Nom dans le filigrane diagonal (rouge) :",
+        ).pack(anchor="w", padx=16, pady=(4, 2))
+        ctk.CTkEntry(
+            card, textvariable=self.name_var,
+            placeholder_text="Entrez le nom…",
+        ).pack(fill="x", padx=16, pady=(0, 10))
+
+        # Footer toggle + input
+        ctk.CTkCheckBox(
+            card,
+            text="Utiliser le filigrane de pied de page (bleu) :",
+            variable=self.use_footer_var,
+            command=self.toggle_footer_options,
+            onvalue=True, offvalue=False,
+        ).pack(anchor="w", padx=16, pady=(4, 2))
+
+        self.footer_entry = ctk.CTkEntry(card, textvariable=self.footer_var)
+        self.footer_entry.pack(fill="x", padx=16, pady=(0, 14))
+
+    # ── Action button ─────────────────────────────────────────────
+
+    def _create_action_section(self, parent: ctk.CTkFrame) -> None:
+        self.start_button = ctk.CTkButton(
+            parent,
+            text="Lancer la suppression des filigranes",
+            height=44,
+            corner_radius=8,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            command=self.process_in_thread,
         )
-        self.footer_entry.pack(fill='x', pady=(0, 10), padx=10)
-    
-    def create_action_section(self):
-        """Create the action buttons section."""
-        self.start_button = ttk.Button(
-            self.main_frame, 
-            text="Lancer la suppression des filigranes", 
-            command=self.process_in_thread
+        self.start_button.pack(fill="x", pady=(20, 0))
+
+    # ── Progress ──────────────────────────────────────────────────
+
+    def _create_progress_section(self, parent: ctk.CTkFrame) -> None:
+        self.progress_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        # Frame is hidden until processing starts
+
+        self.progress_bar = ctk.CTkProgressBar(
+            self.progress_frame, height=14, corner_radius=7,
         )
-        self.start_button.pack(pady=15)
-    
-    def create_progress_section(self):
-        """Create the progress display section."""
-        self.progress_bar = ttk.Progressbar(
-            self.root, 
-            variable=self.progress_var, 
-            maximum=100
+        self.progress_bar.set(0)
+        self.progress_bar.pack(fill="x", pady=(0, 6))
+
+        self.status_label = ctk.CTkLabel(
+            self.progress_frame,
+            textvariable=self.status_var,
+            font=ctk.CTkFont(size=12),
         )
-        # Progress bar is initially hidden
-        
-        self.status_label = ttk.Label(
-            self.root, 
-            textvariable=self.status_var
-        )
-        # Status label is initially hidden
-    
-    def create_menu_bar(self):
-        """Create the application menu bar."""
+        self.status_label.pack(anchor="w")
+
+    # ── Native menu bar (no CTk equivalent) ───────────────────────
+
+    def create_menu_bar(self) -> None:
+        """Build the application menu bar."""
         self.menu_bar = tk.Menu(self.root)
         self.root.config(menu=self.menu_bar)
-        
-        # Create File menu
-        self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.menu_bar.add_cascade(label="Fichier", menu=self.file_menu)
-        self.file_menu.add_command(
-            label="Vérifier les mises à jour", 
-            command=self.check_updates_callback if hasattr(self, 'check_updates_callback') else None
+
+        file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Fichier", menu=file_menu)
+        file_menu.add_command(
+            label="Vérifier les mises à jour",
+            command=lambda: (
+                self.check_updates_callback()
+                if self.check_updates_callback else None
+            ),
         )
-        self.file_menu.add_separator()
-        self.file_menu.add_command(label="Quitter", command=self.root.quit)
-        
-        # Create Help menu
-        self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.menu_bar.add_cascade(label="Aide", menu=self.help_menu)
-        self.help_menu.add_command(
-            label="Guide d'utilisation", 
-            command=self.show_help_callback if hasattr(self, 'show_help_callback') else None
+        file_menu.add_separator()
+        file_menu.add_command(label="Quitter", command=self.root.quit)
+
+        help_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Aide", menu=help_menu)
+        help_menu.add_command(
+            label="Guide d'utilisation",
+            command=lambda: (
+                self.show_help_callback()
+                if self.show_help_callback else None
+            ),
         )
-        self.help_menu.add_command(
-            label="À propos", 
-            command=self.show_about_callback if hasattr(self, 'show_about_callback') else None
+        help_menu.add_command(
+            label="À propos",
+            command=lambda: (
+                self.show_about_callback()
+                if self.show_about_callback else None
+            ),
         )
-    
-    def toggle_file_mode(self):
-        """Toggle between single file and folder processing modes."""
+
+    # ── Interactions ──────────────────────────────────────────────
+
+    def toggle_file_mode(self) -> None:
+        """Switch between single-file and folder processing."""
         if self.file_mode_var.get():
-            self.input_button.config(text="Sélectionner un fichier PDF")
-            self.input_button.config(command=self.select_single_file)
+            self.input_button.configure(text="Choisir un PDF")
+            self.input_button.configure(command=self.select_single_file)
         else:
-            self.input_button.config(text="Parcourir")
-            self.input_button.config(command=self.select_input)
-    
-    def toggle_footer_options(self):
-        """Enable or disable footer text entry based on checkbox."""
-        if self.use_footer_var.get():
-            self.footer_entry.config(state="normal")
-        else:
-            self.footer_entry.config(state="disabled")
-    
-    def select_input(self):
-        """Open folder selection dialog for input."""
-        folder_selected = filedialog.askdirectory()
-        if folder_selected:
-            self.input_var.set(folder_selected)
-    
-    def select_output(self):
-        """Open folder selection dialog for output."""
-        folder_selected = filedialog.askdirectory()
-        if folder_selected:
-            self.output_var.set(folder_selected)
-    
-    def select_single_file(self):
-        """Open file selection dialog for single PDF."""
-        file_selected = filedialog.askopenfilename(filetypes=[("Fichiers PDF", "*.pdf")])
-        if file_selected:
-            self.input_var.set(file_selected)
-            # Enable single file mode
+            self.input_button.configure(text="Parcourir")
+            self.input_button.configure(command=self.select_input)
+
+    def toggle_footer_options(self) -> None:
+        """Enable / disable the footer text entry."""
+        self.footer_entry.configure(
+            state="normal" if self.use_footer_var.get() else "disabled"
+        )
+
+    def select_input(self) -> None:
+        folder = filedialog.askdirectory()
+        if folder:
+            self.input_var.set(folder)
+
+    def select_output(self) -> None:
+        folder = filedialog.askdirectory()
+        if folder:
+            self.output_var.set(folder)
+
+    def select_single_file(self) -> None:
+        path = filedialog.askopenfilename(
+            filetypes=[("Fichiers PDF", "*.pdf")]
+        )
+        if path:
+            self.input_var.set(path)
             self.file_mode_var.set(True)
-    
-    def process_in_thread(self):
-        """Start processing in a separate thread to keep UI responsive."""
-        # Disable start button during processing
-        self.start_button.config(state=tk.DISABLED)
-        
+
+    # ── Processing ────────────────────────────────────────────────
+
+    def process_in_thread(self) -> None:
+        """Launch watermark removal in a background thread."""
+        self.start_button.configure(state="disabled")
+
         input_path = self.input_var.get()
         output_path = self.output_var.get()
         name_pattern = self.name_var.get()
-        footer_pattern = self.footer_var.get() if self.use_footer_var.get() else ""
-        
-        # Validate inputs
+        footer_pattern = (
+            self.footer_var.get() if self.use_footer_var.get() else ""
+        )
+
+        # Validate
         if not input_path:
-            messagebox.showerror("Erreur", "Veuillez sélectionner un dossier source ou un fichier PDF.")
-            self.start_button.config(state=tk.NORMAL)
+            messagebox.showerror(
+                "Erreur",
+                "Veuillez sélectionner un dossier source ou un fichier PDF.",
+            )
+            self.start_button.configure(state="normal")
             return
-        
+
         if not output_path and not self.file_mode_var.get():
-            messagebox.showerror("Erreur", "Veuillez sélectionner un dossier de destination.")
-            self.start_button.config(state=tk.NORMAL)
+            messagebox.showerror(
+                "Erreur",
+                "Veuillez sélectionner un dossier de destination.",
+            )
+            self.start_button.configure(state="normal")
             return
-        
-        # Handle single file mode
+
+        output_file = ""
         if self.file_mode_var.get():
             if not input_path.lower().endswith(".pdf"):
-                messagebox.showerror("Erreur", "Le fichier sélectionné n'est pas un PDF.")
-                self.start_button.config(state=tk.NORMAL)
+                messagebox.showerror(
+                    "Erreur", "Le fichier sélectionné n'est pas un PDF."
+                )
+                self.start_button.configure(state="normal")
                 return
-                
+
+            base, ext = os.path.splitext(os.path.basename(input_path))
+            stamp = int(time.time())
             if not output_path:
-                # Generate output filename in same directory
-                dirname = os.path.dirname(input_path)
-                filename = os.path.basename(input_path)
-                name, ext = os.path.splitext(filename)
-                timestamp = int(time.time())
-                output_file = os.path.join(dirname, f"{name}_sans_filigrane_{timestamp}{ext}")
+                output_file = os.path.join(
+                    os.path.dirname(input_path),
+                    f"{base}_sans_filigrane_{stamp}{ext}",
+                )
             elif os.path.isdir(output_path):
-                # Generate output filename in specified directory
-                filename = os.path.basename(input_path)
-                name, ext = os.path.splitext(filename)
-                timestamp = int(time.time())
-                output_file = os.path.join(output_path, f"{name}_sans_filigrane_{timestamp}{ext}")
+                output_file = os.path.join(
+                    output_path, f"{base}_sans_filigrane_{stamp}{ext}"
+                )
             else:
-                # Use specified full path
                 output_file = output_path
-        
-        # Show progress indicators
+
+        # Show progress
         self.progress_var.set(0)
-        self.progress_bar.pack(pady=10, fill='x', padx=20)
-        self.status_var.set("Démarrage du traitement...")
-        self.status_label.pack(pady=5)
-        
-        # Define thread function
-        def run_process():
+        self.progress_frame.pack(fill="x", pady=(16, 0))
+        self.status_var.set("Démarrage du traitement…")
+
+        def run_process() -> None:
             success = False
-            
             try:
                 if self.file_mode_var.get():
-                    # Process single file
-                    self.status_var.set(f"Traitement de {os.path.basename(input_path)}...")
+                    self.status_var.set(
+                        f"Traitement de {os.path.basename(input_path)}…"
+                    )
                     success = self.watermark_processor.remove_watermark_by_structure(
-                        input_path, output_file, name_pattern, footer_pattern, 
-                        self.progress_var
+                        input_path, output_file, name_pattern,
+                        footer_pattern, self.progress_var,
                     )
                 else:
-                    # Process folder
                     success = self.watermark_processor.process_folder(
-                        input_path, output_path, name_pattern, footer_pattern, 
-                        self.progress_var, self.status_var
+                        input_path, output_path, name_pattern,
+                        footer_pattern, self.progress_var, self.status_var,
                     )
-            except Exception as e:
+            except Exception as exc:
                 success = False
-                self.root.after(0, lambda: self.status_var.set(f"Erreur: {str(e)}"))
-                self.root.after(0, lambda: messagebox.showerror("Erreur", f"Une erreur est survenue: {str(e)}"))
-            
-            # Update UI
+                self.root.after(
+                    0, lambda: self.status_var.set(f"Erreur : {exc}")
+                )
+                self.root.after(
+                    0,
+                    lambda: messagebox.showerror(
+                        "Erreur", f"Une erreur est survenue : {exc}"
+                    ),
+                )
+
             self.root.after(0, lambda: self.progress_var.set(100))
             if success:
-                self.root.after(0, lambda: self.status_var.set("Suppression des filigranes terminée !"))
-                self.root.after(0, lambda: messagebox.showinfo("Succès", "Suppression des filigranes terminée !"))
-            
-            # Re-enable start button
-            self.root.after(0, lambda: self.start_button.config(state=tk.NORMAL))
-        
-        # Start processing thread
-        thread = threading.Thread(target=run_process)
-        thread.daemon = True
+                self.root.after(
+                    0,
+                    lambda: self.status_var.set(
+                        "Suppression des filigranes terminée !"
+                    ),
+                )
+                self.root.after(
+                    0,
+                    lambda: messagebox.showinfo(
+                        "Succès",
+                        "Suppression des filigranes terminée !",
+                    ),
+                )
+            self.root.after(
+                0, lambda: self.start_button.configure(state="normal")
+            )
+
+        thread = threading.Thread(target=run_process, daemon=True)
         thread.start()
-    
-    # Callback setter methods
-    def set_show_help_callback(self, callback):
-        """Set callback for help button."""
+
+    # ── Callback setters ──────────────────────────────────────────
+
+    def set_show_help_callback(self, callback) -> None:
         self.show_help_callback = callback
-    
-    def set_show_about_callback(self, callback):
-        """Set callback for about menu item."""
+
+    def set_show_about_callback(self, callback) -> None:
         self.show_about_callback = callback
-    
-    def set_check_updates_callback(self, callback):
-        """Set callback for check updates menu item."""
+
+    def set_check_updates_callback(self, callback) -> None:
         self.check_updates_callback = callback

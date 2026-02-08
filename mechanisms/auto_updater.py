@@ -1,16 +1,34 @@
 """
 Auto-updater module for PDF Watermark Remover application.
-Handles checking for updates, downloading and installing new versions.
+
+Handles checking for updates against GitHub releases, downloading
+new versions, and launching an update batch script.
 """
 
-import os
+import hashlib
 import json
+import logging
+import os
+import re
 import ssl
-import urllib.request
+import sys
 import tempfile
 import tkinter as tk
-from tkinter import ttk, messagebox
-import sys
+import urllib.request
+from tkinter import messagebox
+
+import customtkinter as ctk
+from typing import Optional, Tuple
+
+logger = logging.getLogger("watermark_app.updater")
+
+
+def _parse_version(version_str: str) -> Tuple[int, ...]:
+    """Parse a version string like '1.10.2' into a comparable tuple (1, 10, 2)."""
+    try:
+        return tuple(int(p) for p in version_str.strip().split("."))
+    except (ValueError, AttributeError):
+        return (0,)
 
 class AutoUpdater:
     """Handles the application update process."""
@@ -22,23 +40,23 @@ class AutoUpdater:
         self.current_version = self._get_current_version()
         self.update_installer_path = None
     
-    def _get_current_version(self):
+    def _get_current_version(self) -> str:
         """Get the current version from the version.txt file."""
         try:
-            # Determine base path based on whether running frozen or not
             if getattr(sys, 'frozen', False):
                 base_path = os.path.dirname(sys.executable)
             else:
                 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 
             version_file = os.path.join(base_path, "version.txt")
-            
+
             if os.path.exists(version_file):
                 with open(version_file, "r") as f:
                     return f.read().strip()
-            return "1.0"  # Fallback version
-        except:
-            return "1.0"  # Fallback version
+            return "1.0"
+        except (OSError, ValueError) as exc:
+            logger.warning("Could not read version.txt: %s", exc)
+            return "1.0"
     
     def check_for_updates(self, silent=False, auto_install=False):
         """Check if a newer version is available and offer to update."""
@@ -62,7 +80,19 @@ class AutoUpdater:
             
             # Get release notes (body of the release)
             release_notes = release_info.get("body", "")
-            
+
+            # Try to extract SHA-256 checksum from release body
+            # Expected format: SHA256: <hexdigest>  or  `SHA256: <hexdigest>`
+            expected_checksum: Optional[str] = None
+            checksum_match = re.search(
+                r"SHA256:\s*`?([a-fA-F0-9]{64})`?", release_notes
+            )
+            if checksum_match:
+                expected_checksum = checksum_match.group(1).lower()
+                logger.info("Found release checksum: %s...", expected_checksum[:12])
+            else:
+                logger.warning("No SHA-256 checksum found in release notes")
+
             # Format changes as bullet points
             changes = []
             for line in release_notes.split("\n"):
@@ -70,16 +100,21 @@ class AutoUpdater:
                 if line and not line.startswith("#"):  # Skip headings
                     changes.append(line)
             
-            # Compare versions (simple string comparison works for x.y.z format)
-            if latest_version and latest_version > self.current_version and download_url:
+            # Compare versions using tuple comparison (handles multi-digit segments)
+            if (
+                latest_version
+                and _parse_version(latest_version) > _parse_version(self.current_version)
+                and download_url
+            ):
                 # Format changes list
                 changes_text = "\n".join([f"• {change}" for change in changes[:5]])  # Show first 5 changes
                 if not changes_text:
                     changes_text = "Améliorations diverses et corrections de bugs."
                 
                 if auto_install:
-                    # Automatically download and prepare update
-                    return self.download_and_prepare_update(latest_version, download_url)
+                    return self.download_and_prepare_update(
+                        latest_version, download_url, expected_checksum
+                    )
                 else:
                     # Show update dialog with option to download
                     update_message = f"""Une nouvelle version ({latest_version}) est disponible!
@@ -92,7 +127,9 @@ Changements:
 Voulez-vous télécharger et installer la mise à jour?"""
                     
                     if messagebox.askyesno("Mise à jour disponible", update_message):
-                        return self.download_and_prepare_update(latest_version, download_url)
+                        return self.download_and_prepare_update(
+                            latest_version, download_url, expected_checksum
+                        )
                 return True
             elif not silent:
                 messagebox.showinfo("Pas de mise à jour", "Vous utilisez déjà la dernière version.")
@@ -105,40 +142,37 @@ Voulez-vous télécharger et installer la mise à jour?"""
                 )
             return False
     
-    def download_and_prepare_update(self, new_version, download_url):
-        """Download the update and prepare it for installation."""
+    def download_and_prepare_update(
+        self,
+        new_version: str,
+        download_url: str,
+        expected_checksum: Optional[str] = None,
+    ) -> bool:
+        """Download the update, verify its integrity, and prepare installation."""
         try:
             # Show progress dialog
-            progress_dialog = tk.Toplevel(self.parent)
+            progress_dialog = ctk.CTkToplevel(self.parent)
             progress_dialog.title("Téléchargement en cours")
-            progress_dialog.geometry("400x150")
+            progress_dialog.geometry("440x160")
             progress_dialog.transient(self.parent)
             progress_dialog.grab_set()
             progress_dialog.resizable(False, False)
-            
-            # Progress label
-            progress_label = tk.Label(
+
+            ctk.CTkLabel(
                 progress_dialog,
-                text=f"Téléchargement de la version {new_version}...",
-                font=("Arial", 10)
+                text=f"Téléchargement de la version {new_version}\u2026",
+                font=ctk.CTkFont(size=13),
+            ).pack(pady=(24, 14))
+
+            progress_bar = ctk.CTkProgressBar(
+                progress_dialog, width=380, height=14, corner_radius=7,
             )
-            progress_label.pack(pady=(20, 10))
-            
-            # Progress bar
-            progress_var = tk.DoubleVar()
-            progress_bar = ttk.Progressbar(
-                progress_dialog,
-                variable=progress_var,
-                maximum=100,
-                length=350
-            )
-            progress_bar.pack(pady=10, padx=25)
-            
-            # Update function for progress bar
+            progress_bar.set(0)
+            progress_bar.pack(pady=(0, 12), padx=30)
+
             def update_progress(count, block_size, total_size):
                 if total_size > 0:
-                    percent = min(count * block_size * 100 / total_size, 100)
-                    progress_var.set(percent)
+                    progress_bar.set(min(count * block_size / total_size, 1.0))
                     progress_dialog.update()
             
             # Prepare download location
@@ -150,6 +184,33 @@ Voulez-vous télécharger et installer la mise à jour?"""
             # Download the file
             try:
                 urllib.request.urlretrieve(download_url, installer_path, reporthook=update_progress)
+
+                # Verify integrity if a checksum was provided in the release
+                if expected_checksum:
+                    sha256 = hashlib.sha256()
+                    with open(installer_path, "rb") as f:
+                        for chunk in iter(lambda: f.read(65536), b""):
+                            sha256.update(chunk)
+                    actual_checksum = sha256.hexdigest().lower()
+                    if actual_checksum != expected_checksum:
+                        logger.error(
+                            "Checksum mismatch: expected %s, got %s",
+                            expected_checksum, actual_checksum,
+                        )
+                        progress_dialog.destroy()
+                        messagebox.showerror(
+                            "Erreur d'intégrité",
+                            "Le fichier téléchargé est corrompu ou a été modifié.\n"
+                            "La mise à jour a été annulée par sécurité.\n\n"
+                            "Veuillez réessayer ou télécharger manuellement.",
+                        )
+                        try:
+                            os.remove(installer_path)
+                        except OSError:
+                            pass
+                        return False
+                    logger.info("Checksum verified successfully")
+
                 progress_dialog.destroy()
                 
                 # Offer to install

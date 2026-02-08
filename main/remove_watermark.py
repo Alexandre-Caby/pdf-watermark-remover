@@ -1,18 +1,19 @@
 """
-Suppression de Filigrane PDF
-Copyright © 2025 Alexandre Caby. All rights reserved.
+Main application orchestrator for Suppression de Filigrane PDF.
 
-This software is proprietary and confidential.
-Unauthorized copying, distribution, modification, public display,
-or public performance of this software is strictly prohibited.
-
-This software is provided under a license agreement and may be used
-only in accordance with the terms of that agreement.
+Copyright © 2025 Alexandre Caby.
+Licensed under the GNU General Public License v3.0.
+See LICENSE for details.
 """
 
+import logging
 import os
 import sys
 import tkinter as tk
+
+import customtkinter as ctk
+
+logger = logging.getLogger("watermark_app.main")
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -27,23 +28,25 @@ from ui.app_styles import AppStyles
 from mechanisms import auto_updater
 
 class WatermarkRemoverApp:
-    """Main application class for PDF watermark removal."""
-    
-    def __init__(self, root):
-        """Initialize the application."""
+    """Main application class that wires together all modules."""
+
+    def __init__(self, root: ctk.CTk) -> None:
+        """Initialise modules, show legal dialogs, and validate activation."""
         self.root = root
-        
-        # Get current version for window title
+
+        # Window title with version
         try:
-            # version.txt is at the root of the project directory
-            version_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "version.txt")
+            version_file = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "..", "version.txt"
+            )
             if os.path.exists(version_file):
                 with open(version_file, "r") as f:
                     current_version = f.read().strip()
                     self.root.title(f"Suppression de Filigrane PDF - v{current_version}")
             else:
                 self.root.title("Suppression de Filigrane PDF")
-        except:
+        except (OSError, ValueError) as exc:
+            logger.warning("Could not read version.txt: %s", exc)
             self.root.title("Suppression de Filigrane PDF")
 
         self.root.geometry("650x600")
