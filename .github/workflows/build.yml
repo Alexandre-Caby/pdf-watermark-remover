@@ -149,7 +149,6 @@ jobs:
         git push origin v${{ steps.get_version.outputs.VERSION }}
     
     - name: Prepare release body
-      if: steps.check_tag.outputs.TAG_EXISTS == 'false'
       run: |
         $version = "${{ steps.get_version.outputs.VERSION }}"
         $sha256  = "${{ steps.checksum.outputs.SHA256 }}"
@@ -162,7 +161,6 @@ jobs:
         Set-Content -Path release_body.md -Value $body
     
     - name: Create GitHub Release
-      if: steps.check_tag.outputs.TAG_EXISTS == 'false'
       id: create_release
       uses: softprops/action-gh-release@v1
       with:
