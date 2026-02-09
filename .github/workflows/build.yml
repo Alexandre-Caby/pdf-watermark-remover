@@ -111,7 +111,18 @@ jobs:
           --hidden-import main `
           --hidden-import main.remove_watermark `
           --hidden-import mechanisms `
+          --hidden-import mechanisms.watermark_processor `
+          --hidden-import mechanisms.activation_manager `
+          --hidden-import mechanisms.secure_activation `
+          --hidden-import mechanisms.machine_id `
+          --hidden-import mechanisms.network_utils `
+          --hidden-import mechanisms.auto_updater `
+          --hidden-import mechanisms.i18n `
+          --hidden-import mechanisms._secrets `
           --hidden-import ui `
+          --hidden-import ui.app_ui `
+          --hidden-import ui.app_styles `
+          --hidden-import ui.dialog_windows `
           --paths dist_obf `
           --paths dist_obf/main `
           --paths dist_obf/mechanisms `
