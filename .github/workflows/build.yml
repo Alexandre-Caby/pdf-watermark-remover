@@ -115,6 +115,25 @@ jobs:
           --hidden-import Crypto.Cipher.AES `
           --hidden-import Crypto.Random `
           --hidden-import dotenv `
+          --hidden-import uuid `
+          --hidden-import hashlib `
+          --hidden-import hmac `
+          --hidden-import json `
+          --hidden-import base64 `
+          --hidden-import datetime `
+          --hidden-import re `
+          --hidden-import ssl `
+          --hidden-import tempfile `
+          --hidden-import shutil `
+          --hidden-import threading `
+          --hidden-import webbrowser `
+          --hidden-import urllib `
+          --hidden-import urllib.request `
+          --hidden-import urllib.error `
+          --hidden-import urllib.parse `
+          --hidden-import tkinter `
+          --hidden-import tkinter.messagebox `
+          --hidden-import tkinter.filedialog `
           --hidden-import main `
           --hidden-import main.remove_watermark `
           --hidden-import mechanisms `
