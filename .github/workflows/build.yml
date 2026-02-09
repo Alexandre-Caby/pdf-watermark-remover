@@ -106,6 +106,8 @@ jobs:
           --add-data "admin_contact.json;." `
           --add-data "revocation_list.json;." `
           --add-data "assets/*;assets" `
+          --hidden-import logging.handlers `
+          --hidden-import customtkinter `
           --paths dist_obf `
           --paths dist_obf/main `
           --paths dist_obf/mechanisms `
