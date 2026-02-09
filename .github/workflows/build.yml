@@ -108,6 +108,13 @@ jobs:
           --add-data "assets/*;assets" `
           --hidden-import logging.handlers `
           --hidden-import customtkinter `
+          --hidden-import fitz `
+          --hidden-import pymupdf `
+          --hidden-import Crypto `
+          --hidden-import Crypto.Cipher `
+          --hidden-import Crypto.Cipher.AES `
+          --hidden-import Crypto.Random `
+          --hidden-import dotenv `
           --hidden-import main `
           --hidden-import main.remove_watermark `
           --hidden-import mechanisms `
