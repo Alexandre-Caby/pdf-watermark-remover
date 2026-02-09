@@ -63,17 +63,26 @@ jobs:
         salt = os.environ['ACTIVATION_SALT']
         enc_app = xor_encode(app_key, key)
         enc_salt = xor_encode(salt, key)
+        lines = [
+            '# Auto-generated secrets (XOR-obfuscated). Do not edit.',
+            '',
+            f'_K = bytes.fromhex("{key.hex()}")',
+            '',
+            'def _xor_decode(data, key):',
+            '    return bytes(b ^ key[i % len(key)] for i, b in enumerate(data)).decode("utf-8")',
+            '',
+            f'_ENC_APP_KEY = bytes.fromhex("{enc_app.hex()}")',
+            f'_ENC_SALT = bytes.fromhex("{enc_salt.hex()}")',
+            '',
+            'def get_app_secret_key():',
+            '    return _xor_decode(_ENC_APP_KEY, _K)',
+            '',
+            'def get_activation_salt():',
+            '    return _xor_decode(_ENC_SALT, _K)',
+            '',
+        ]
         with open('mechanisms/_secrets.py', 'w') as f:
-            f.write('\"\"\"Auto-generated secrets (XOR-obfuscated). Do not edit.\"\"\"\\n\\n')
-            f.write(f'_K = bytes.fromhex("{key.hex()}")\n\n')
-            f.write('def _xor_decode(data, key):\n')
-            f.write('    return bytes(b ^ key[i % len(key)] for i, b in enumerate(data)).decode("utf-8")\n\n')
-            f.write(f'_ENC_APP_KEY = bytes.fromhex("{enc_app.hex()}")\n')
-            f.write(f'_ENC_SALT = bytes.fromhex("{enc_salt.hex()}")\n\n')
-            f.write('def get_app_secret_key():\\n')
-            f.write('    return _xor_decode(_ENC_APP_KEY, _K)\\n\\n')
-            f.write('def get_activation_salt():\\n')
-            f.write('    return _xor_decode(_ENC_SALT, _K)\\n')
+            f.write('\n'.join(lines))
         print('Secrets module generated successfully')
         "@
     
