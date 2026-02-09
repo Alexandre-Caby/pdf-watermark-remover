@@ -49,15 +49,10 @@ try:
         logger.info("MEIPASS: %s", getattr(sys, '_MEIPASS', 'Not available'))
     logger.debug("sys.path: %s", sys.path)
 
-    # Import differently based on whether we're frozen or not
-    if getattr(sys, 'frozen', False):
-        # Frozen executable: all .py files are flattened into the same directory
-        logger.info("Using direct import (frozen app)")
-        from remove_watermark import WatermarkRemoverApp
-    else:
-        # Running from source: use package import
-        logger.info("Using package import (source code)")
-        from main.remove_watermark import WatermarkRemoverApp
+    # Always use package import — PyInstaller preserves package structure
+    # when building from the obfuscated dist_obf/ directory.
+    logger.info("Importing main.remove_watermark")
+    from main.remove_watermark import WatermarkRemoverApp
 
     if __name__ == "__main__":
         root = ctk.CTk()

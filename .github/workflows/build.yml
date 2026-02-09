@@ -108,6 +108,10 @@ jobs:
           --add-data "assets/*;assets" `
           --hidden-import logging.handlers `
           --hidden-import customtkinter `
+          --hidden-import main `
+          --hidden-import main.remove_watermark `
+          --hidden-import mechanisms `
+          --hidden-import ui `
           --paths dist_obf `
           --paths dist_obf/main `
           --paths dist_obf/mechanisms `
