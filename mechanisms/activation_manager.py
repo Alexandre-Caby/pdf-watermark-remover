@@ -28,9 +28,9 @@ logger = logging.getLogger("watermark_app.activation")
 
 # Default contact info used as final fallback
 _DEFAULT_ADMIN_CONTACT = {
-    "name": "Alexandre Caby",
-    "email": "alexandre.caby@sncf.fr",
-    "role": "Alternant ingénieur chez TechniFret",
+    "name": "Pierre VAN-LANCHER",
+    "email": "Pierre.VAN-LANCHER@sncf.fr",
+    "role": "Agent Méthodes Technis"
 }
 
 _ADMIN_CONTACT_URL = (

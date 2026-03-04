@@ -2,6 +2,26 @@
 
 All notable changes to the PDF Watermark Remover will be documented in this file.
 
+## [1.2.1] - 2026-03-04
+
+### Bug Fixes
+- Fixed the default admin contact information
+
+## [1.2.0] - 2026-03-04
+
+### New Features & Enhancements
+- Modernized the UI with CustomTkinter.
+- Added Internationalization (i18n) support.
+- Implemented network resilience, machine ID binding, and dedicated secrets management.
+
+### Build and Packaging Improvements
+- Updated PyArmor integration to use the newer v8+ API (`pyarmor gen`).
+- Resolved various issues with frozen module importing and module copying in PyInstaller.
+- Improved `_secrets.py` generation using hex strings to ensure compatibility with PyArmor obfuscation and avoid escaping issues.
+- Added comprehensive PyInstaller hidden-imports for the standard library, third-party packages, and sub-modules to prevent missing modules in the frozen executable.
+- Fixed the creation of a release when the tag already exists.
+- Corrected package import handling in the frozen executable.
+
 ## [1.1.0] - 2025-04-07
 
 ### Major Code Restructuring
