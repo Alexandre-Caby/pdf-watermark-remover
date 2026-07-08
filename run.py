@@ -6,7 +6,6 @@ Bootstraps logging, resolves frozen/source imports, and launches the main window
 import os
 import sys
 import logging
-import logging.handlers
 import tkinter as tk
 import traceback
 
@@ -14,29 +13,15 @@ import customtkinter as ctk
 
 
 def _setup_logging() -> logging.Logger:
-    """Configure application-wide logging with a rotating file handler."""
-    if getattr(sys, 'frozen', False):
-        log_dir = os.path.dirname(sys.executable)
-    else:
-        log_dir = os.path.dirname(os.path.abspath(__file__))
+    """Configure the application logger without writing anything to disk.
 
-    log_path = os.path.join(log_dir, "watermark_app.log")
+    Modules still call logger.info/warning/error as before; a NullHandler
+    simply discards those records so no watermark_app.log file is ever
+    created next to the executable.
+    """
     logger = logging.getLogger("watermark_app")
     logger.setLevel(logging.DEBUG)
-
-    try:
-        handler = logging.handlers.RotatingFileHandler(
-            log_path, maxBytes=1_048_576, backupCount=3, encoding="utf-8"
-        )
-        handler.setFormatter(
-            logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-        )
-        logger.addHandler(handler)
-    except OSError:
-        # If we cannot write to the log location, add a NullHandler so
-        # logging calls don't raise. The app should still start.
-        logger.addHandler(logging.NullHandler())
-
+    logger.addHandler(logging.NullHandler())
     return logger
 
 
@@ -97,7 +82,8 @@ except Exception as exc:
         tk.Label(error_root, text=str(exc), wraplength=450).pack(pady=10)
         tk.Label(
             error_root,
-            text="Consultez watermark_app.log pour plus de détails.",
+            text="Si le problème persiste, contactez le support technique.",
+            wraplength=450,
         ).pack(pady=10)
         tk.Button(error_root, text="Quitter", command=error_root.destroy).pack(pady=20)
         error_root.mainloop()

@@ -48,44 +48,6 @@ jobs:
           echo "TAG_EXISTS=false" >> $env:GITHUB_OUTPUT
         }
 
-    - name: Generate secrets module (XOR-obfuscated)
-      env:
-        APP_SECRET_KEY: ${{ secrets.ENV_APP_SECRET_KEY }}
-        ACTIVATION_SALT: ${{ secrets.ENV_ACTIVATION_SALT }}
-      run: |
-        python -c @"
-        import os, secrets as sec
-        key = sec.token_bytes(32)
-        def xor_encode(value, k):
-            data = value.encode('utf-8')
-            return bytes(b ^ k[i % len(k)] for i, b in enumerate(data))
-        app_key = os.environ['APP_SECRET_KEY']
-        salt = os.environ['ACTIVATION_SALT']
-        enc_app = xor_encode(app_key, key)
-        enc_salt = xor_encode(salt, key)
-        lines = [
-            '# Auto-generated secrets (XOR-obfuscated). Do not edit.',
-            '',
-            f'_K = bytes.fromhex("{key.hex()}")',
-            '',
-            'def _xor_decode(data, key):',
-            '    return bytes(b ^ key[i % len(key)] for i, b in enumerate(data)).decode("utf-8")',
-            '',
-            f'_ENC_APP_KEY = bytes.fromhex("{enc_app.hex()}")',
-            f'_ENC_SALT = bytes.fromhex("{enc_salt.hex()}")',
-            '',
-            'def get_app_secret_key():',
-            '    return _xor_decode(_ENC_APP_KEY, _K)',
-            '',
-            'def get_activation_salt():',
-            '    return _xor_decode(_ENC_SALT, _K)',
-            '',
-        ]
-        with open('mechanisms/_secrets.py', 'w') as f:
-            f.write('\n'.join(lines))
-        print('Secrets module generated successfully')
-        "@
-    
     - name: Obfuscate Code with PyArmor
       run: |
         # Verify entry points exist
@@ -96,8 +58,6 @@ jobs:
         else { echo "File main/remove_watermark.py does not exist"; exit 1 }
 
         # PyArmor 8+ uses 'gen' instead of the removed 'obfuscate' command
-        # _secrets.py now uses hex strings instead of byte literals, so
-        # PyArmor can parse and obfuscate it together with everything else.
         pyarmor gen --recursive --output dist_obf run.py main/ mechanisms/ ui/
 
         # List obfuscated files to confirm
@@ -108,35 +68,13 @@ jobs:
         # Build from the obfuscated output
         python -m PyInstaller --onefile --windowed --icon=assets/icons/icon_remove_watermark.ico `
           --add-data "version.txt;." `
-          --add-data "locales;locales" `
-          --add-data "admin_contact.json;." `
-          --add-data "revocation_list.json;." `
           --add-data "assets/*;assets" `
-          --hidden-import logging.handlers `
           --hidden-import customtkinter `
           --hidden-import fitz `
           --hidden-import pymupdf `
-          --hidden-import Crypto `
-          --hidden-import Crypto.Cipher `
-          --hidden-import Crypto.Cipher.AES `
-          --hidden-import Crypto.Random `
-          --hidden-import dotenv `
-          --hidden-import uuid `
-          --hidden-import hashlib `
-          --hidden-import hmac `
-          --hidden-import json `
-          --hidden-import base64 `
-          --hidden-import datetime `
-          --hidden-import re `
-          --hidden-import ssl `
           --hidden-import tempfile `
           --hidden-import shutil `
           --hidden-import threading `
-          --hidden-import webbrowser `
-          --hidden-import urllib `
-          --hidden-import urllib.request `
-          --hidden-import urllib.error `
-          --hidden-import urllib.parse `
           --hidden-import tkinter `
           --hidden-import tkinter.messagebox `
           --hidden-import tkinter.filedialog `
@@ -144,13 +82,6 @@ jobs:
           --hidden-import main.remove_watermark `
           --hidden-import mechanisms `
           --hidden-import mechanisms.watermark_processor `
-          --hidden-import mechanisms.activation_manager `
-          --hidden-import mechanisms.secure_activation `
-          --hidden-import mechanisms.machine_id `
-          --hidden-import mechanisms.network_utils `
-          --hidden-import mechanisms.auto_updater `
-          --hidden-import mechanisms.i18n `
-          --hidden-import mechanisms._secrets `
           --hidden-import ui `
           --hidden-import ui.app_ui `
           --hidden-import ui.app_styles `

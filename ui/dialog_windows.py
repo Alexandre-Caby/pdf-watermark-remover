@@ -6,12 +6,61 @@ Houses the EULA acceptance dialog, usage help guide, and About box.
 
 import logging
 import os
+import re
 import tkinter as tk
 from tkinter import messagebox
 
 import customtkinter as ctk
 
 logger = logging.getLogger("watermark_app.dialogs")
+
+_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+
+
+def _render_markdown(textbox: ctk.CTkTextbox, markdown_text: str) -> None:
+    """Render a small, practical subset of Markdown into a CTkTextbox.
+
+    Supports '#', '##', '### ' headings, '**bold**' inline spans, and
+    '- ' / '* ' bullet lists. This avoids showing raw '##'/'**' syntax
+    to the user while keeping legal documents editable as plain .md files.
+    """
+    textbox.tag_config("h1", font=("", 16, "bold"))
+    textbox.tag_config("h2", font=("", 14, "bold"))
+    textbox.tag_config("h3", font=("", 13, "bold"))
+    textbox.tag_config("bold", font=("", 12, "bold"))
+    textbox.tag_config("bullet", lmargin1=18, lmargin2=30)
+    textbox.tag_config("body", font=("", 12))
+
+    def insert_inline(text: str, base_tag: str) -> None:
+        pos = 0
+        for match in _BOLD_RE.finditer(text):
+            if match.start() > pos:
+                textbox.insert("end", text[pos:match.start()], base_tag)
+            textbox.insert("end", match.group(1), (base_tag, "bold"))
+            pos = match.end()
+        textbox.insert("end", text[pos:], base_tag)
+
+    for raw_line in markdown_text.splitlines():
+        stripped = raw_line.strip()
+
+        if stripped.startswith("### "):
+            insert_inline(stripped[4:], "h3")
+            textbox.insert("end", "\n\n")
+        elif stripped.startswith("## "):
+            insert_inline(stripped[3:], "h2")
+            textbox.insert("end", "\n\n")
+        elif stripped.startswith("# "):
+            insert_inline(stripped[2:], "h1")
+            textbox.insert("end", "\n\n")
+        elif stripped.startswith("- ") or stripped.startswith("* "):
+            textbox.insert("end", "•  ", "bullet")
+            insert_inline(stripped[2:], "bullet")
+            textbox.insert("end", "\n")
+        elif not stripped:
+            textbox.insert("end", "\n")
+        else:
+            insert_inline(stripped, "body")
+            textbox.insert("end", "\n")
 
 
 class DialogWindows:
@@ -61,20 +110,20 @@ class DialogWindows:
         )
         try:
             with open(legal_path, "r", encoding="utf-8") as fh:
-                textbox.insert("1.0", fh.read())
+                _render_markdown(textbox, fh.read())
         except Exception:
-            textbox.insert(
-                "1.0",
-                "CONTRAT DE LICENCE UTILISATEUR FINAL\n\n"
+            _render_markdown(
+                textbox,
+                "# CONTRAT DE LICENCE UTILISATEUR FINAL\n\n"
                 "Le fichier EULA.md n'a pas pu être chargé. "
                 "Veuillez consulter le dossier 'assets/legal' pour les "
                 "conditions complètes d'utilisation.\n\n"
-                "Résumé des conditions :\n"
-                "• Ce logiciel est distribué sous licence GPL-3.0\n"
-                "• L'auteur original est Alexandre Caby\n"
-                "• Vous pouvez utiliser, modifier et redistribuer le "
+                "**Résumé des conditions :**\n"
+                "- Ce logiciel est distribué sous licence GPL-3.0\n"
+                "- L'auteur original est Alexandre Caby\n"
+                "- Vous pouvez utiliser, modifier et redistribuer le "
                 "logiciel sous les mêmes termes\n"
-                "• Le logiciel est fourni « en l'état » sans garantie",
+                "- Le logiciel est fourni « en l'état » sans garantie",
             )
         textbox.configure(state="disabled")
 
@@ -246,8 +295,9 @@ class DialogWindows:
         """Display copyright, version, and legal information."""
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("À propos")
-        dialog.geometry("500x480")
-        dialog.resizable(False, False)
+        dialog.geometry("620x720")
+        dialog.minsize(560, 620)
+        dialog.resizable(True, True)
         dialog.transient(self.root)
         dialog.grab_set()
 
@@ -288,15 +338,6 @@ class DialogWindows:
             font=ctk.CTkFont(size=13),
         ).pack(pady=(0, 16))
 
-        # Update button
-        ctk.CTkButton(
-            dialog, text="Vérifier les mises à jour", width=220,
-            command=lambda: (
-                self.update_callback()
-                if hasattr(self, "update_callback") else None
-            ),
-        ).pack(pady=(0, 16))
-
         # Copyright
         try:
             cp_path = os.path.join(
@@ -309,6 +350,7 @@ class DialogWindows:
                     (l for l in lines if l.strip() and not l.strip().startswith("#")),
                     "Copyright © 2025 Alexandre Caby. All rights reserved.",
                 )
+                cp_text = _BOLD_RE.sub(r"\1", cp_text).strip("* ").strip()
         except Exception:
             cp_text = "Copyright © 2025 Alexandre Caby. All rights reserved."
 
@@ -316,11 +358,11 @@ class DialogWindows:
             dialog, text=cp_text, font=ctk.CTkFont(size=12),
         ).pack(pady=(0, 16))
 
-        # Legal text box
+        # Legal text box — takes up the remaining space and scrolls
         legal_box = ctk.CTkTextbox(
-            dialog, height=120, corner_radius=8, wrap="word",
+            dialog, corner_radius=8, wrap="word",
         )
-        legal_box.pack(fill="x", padx=24, pady=(0, 16))
+        legal_box.pack(fill="both", expand=True, padx=24, pady=(0, 16))
 
         try:
             with open(cp_path, "r", encoding="utf-8") as fh:
@@ -329,10 +371,10 @@ class DialogWindows:
                     (i for i, l in enumerate(all_lines) if "LOGICIEL LIBRE" in l),
                     1,
                 )
-                legal_box.insert("1.0", "".join(all_lines[start:]))
+                _render_markdown(legal_box, "".join(all_lines[start:]))
         except Exception:
-            legal_box.insert(
-                "1.0",
+            _render_markdown(
+                legal_box,
                 "Ce logiciel est distribué sous la licence GNU General "
                 "Public License v3.0.\n\n"
                 "L'auteur original de ce logiciel est Alexandre Caby.\n\n"
@@ -357,9 +399,3 @@ class DialogWindows:
             self.root.winfo_height() - dialog.winfo_height()
         ) // 2
         dialog.geometry(f"+{x}+{y}")
-
-    # ── Callback setter ──────────────────────────────────────────
-
-    def set_update_callback(self, callback) -> None:
-        """Set callback for the update button in the About dialog."""
-        self.update_callback = callback

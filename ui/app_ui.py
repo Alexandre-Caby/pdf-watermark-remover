@@ -21,10 +21,9 @@ class AppUI:
         """Initialise UI with the root window and watermark processor."""
         self.root = root
         self.watermark_processor = watermark_processor
-        # Callbacks — set after construction via setters
+        # Callbacks épurés
         self.show_help_callback = None
         self.show_about_callback = None
-        self.check_updates_callback = None
         self.init_variables()
 
     # ── Variables ──────────────────────────────────────────────────
@@ -53,13 +52,11 @@ class AppUI:
 
     def create_ui(self) -> None:
         """Build the complete user interface."""
-        # Scrollable container for the whole window
         self.main_frame = ctk.CTkScrollableFrame(self.root, corner_radius=0)
         self.main_frame.pack(fill="both", expand=True, padx=0, pady=0)
 
         self._create_header()
 
-        # Central content pane
         content = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         content.pack(fill="both", expand=True, padx=24, pady=(0, 24))
 
@@ -70,7 +67,6 @@ class AppUI:
         self._create_progress_section(content)
         self.create_menu_bar()
 
-        # Apply initial state
         self.toggle_footer_options()
 
     # ── Header ────────────────────────────────────────────────────
@@ -115,7 +111,6 @@ class AppUI:
     # ── Source / Destination ──────────────────────────────────────
 
     def _create_io_section(self, parent: ctk.CTkFrame) -> None:
-        # Source
         ctk.CTkLabel(
             parent, text="Source",
             font=ctk.CTkFont(size=13, weight="bold"),
@@ -135,7 +130,6 @@ class AppUI:
         )
         self.input_button.pack(side="right")
 
-        # Destination
         ctk.CTkLabel(
             parent, text="Destination",
             font=ctk.CTkFont(size=13, weight="bold"),
@@ -165,7 +159,6 @@ class AppUI:
             font=ctk.CTkFont(size=14, weight="bold"),
         ).pack(anchor="w", padx=16, pady=(14, 6))
 
-        # Diagonal name
         ctk.CTkLabel(
             card, text="Nom dans le filigrane diagonal (rouge) :",
         ).pack(anchor="w", padx=16, pady=(4, 2))
@@ -174,7 +167,6 @@ class AppUI:
             placeholder_text="Entrez le nom…",
         ).pack(fill="x", padx=16, pady=(0, 10))
 
-        # Footer toggle + input
         ctk.CTkCheckBox(
             card,
             text="Utiliser le filigrane de pied de page (bleu) :",
@@ -203,8 +195,6 @@ class AppUI:
 
     def _create_progress_section(self, parent: ctk.CTkFrame) -> None:
         self.progress_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        # Frame is hidden until processing starts
-
         self.progress_bar = ctk.CTkProgressBar(
             self.progress_frame, height=14, corner_radius=7,
         )
@@ -218,23 +208,15 @@ class AppUI:
         )
         self.status_label.pack(anchor="w")
 
-    # ── Native menu bar (no CTk equivalent) ───────────────────────
+    # ── Native menu bar ───────────────────────────────────────────
 
     def create_menu_bar(self) -> None:
-        """Build the application menu bar."""
+        """Build the application menu bar (Mises à jour retirées)."""
         self.menu_bar = tk.Menu(self.root)
         self.root.config(menu=self.menu_bar)
 
         file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="Fichier", menu=file_menu)
-        file_menu.add_command(
-            label="Vérifier les mises à jour",
-            command=lambda: (
-                self.check_updates_callback()
-                if self.check_updates_callback else None
-            ),
-        )
-        file_menu.add_separator()
         file_menu.add_command(label="Quitter", command=self.root.quit)
 
         help_menu = tk.Menu(self.menu_bar, tearoff=0)
@@ -257,7 +239,6 @@ class AppUI:
     # ── Interactions ──────────────────────────────────────────────
 
     def toggle_file_mode(self) -> None:
-        """Switch between single-file and folder processing."""
         if self.file_mode_var.get():
             self.input_button.configure(text="Choisir un PDF")
             self.input_button.configure(command=self.select_single_file)
@@ -266,7 +247,6 @@ class AppUI:
             self.input_button.configure(command=self.select_input)
 
     def toggle_footer_options(self) -> None:
-        """Enable / disable the footer text entry."""
         self.footer_entry.configure(
             state="normal" if self.use_footer_var.get() else "disabled"
         )
@@ -292,7 +272,6 @@ class AppUI:
     # ── Processing ────────────────────────────────────────────────
 
     def process_in_thread(self) -> None:
-        """Launch watermark removal in a background thread."""
         self.start_button.configure(state="disabled")
 
         input_path = self.input_var.get()
@@ -302,7 +281,6 @@ class AppUI:
             self.footer_var.get() if self.use_footer_var.get() else ""
         )
 
-        # Validate
         if not input_path:
             messagebox.showerror(
                 "Erreur",
@@ -342,7 +320,6 @@ class AppUI:
             else:
                 output_file = output_path
 
-        # Show progress
         self.progress_var.set(0)
         self.progress_frame.pack(fill="x", pady=(16, 0))
         self.status_var.set("Démarrage du traitement…")
@@ -404,6 +381,3 @@ class AppUI:
 
     def set_show_about_callback(self, callback) -> None:
         self.show_about_callback = callback
-
-    def set_check_updates_callback(self, callback) -> None:
-        self.check_updates_callback = callback

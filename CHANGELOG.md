@@ -2,6 +2,22 @@
 
 All notable changes to the PDF Watermark Remover will be documented in this file.
 
+## [1.3.0] - 2026-07-08
+
+### Removed
+- **Activation & Licensing System:** Completely removed machine ID binding, HMAC validation, remote revocation checks, and local encrypted license storage to allow unrestricted standalone use.
+- **Auto-Updater Mechanism:** Removed automatic update checking and dynamic downloading via GitHub API to ensure robust offline operations within strict corporate proxy environments.
+- **Internationalization (i18n):** Removed multi-language support and deleted `locales/` directory (`fr.json`/`en.json`) to enforce a single, optimized desktop interface.
+- **Unused Dependencies & Files:** Deleted obsolete core modules including `activation_manager.py`, `auto_updater.py`, `machine_id.py`, `secure_activation.py`, `_secrets.py`, and `network_utils.py`.
+
+### UI & UX Enhancements
+- Cleaned up the top native menu bar by removing the "Check for updates" option.
+- Simplified application orchestration to instantly open the main window right after EULA acceptance.
+
+### Build and Packaging Improvements
+- Streamlined PyInstaller configuration by eliminating asset inclusion flags for locales, admin contacts, and revocation lists.
+- Simplified the CI/CD build process by eliminating the automated generation of obfuscated or XORed application secrets.
+
 ## [1.2.1] - 2026-03-04
 
 ### Bug Fixes
