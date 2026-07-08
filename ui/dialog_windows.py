@@ -16,7 +16,6 @@ logger = logging.getLogger("watermark_app.dialogs")
 
 _BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
 
-
 def _render_markdown(textbox: ctk.CTkTextbox, markdown_text: str) -> None:
     """Render a small, practical subset of Markdown into a CTkTextbox.
 
@@ -24,43 +23,45 @@ def _render_markdown(textbox: ctk.CTkTextbox, markdown_text: str) -> None:
     '- ' / '* ' bullet lists. This avoids showing raw '##'/'**' syntax
     to the user while keeping legal documents editable as plain .md files.
     """
-    textbox.tag_config("h1", font=("Arial", 16, "bold"))
-    textbox.tag_config("h2", font=("Arial", 14, "bold"))
-    textbox.tag_config("h3", font=("Arial", 13, "bold"))
-    textbox.tag_config("bold", font=("Arial", 12, "bold"))
-    textbox.tag_config("bullet", lmargin1=18, lmargin2=30)
-    textbox.tag_config("body", font=("Arial", 12))
+    inner_text = textbox.textbox
+
+    inner_text.tag_config("h1", font=("Arial", 16, "bold"))
+    inner_text.tag_config("h2", font=("Arial", 14, "bold"))
+    inner_text.tag_config("h3", font=("Arial", 13, "bold"))
+    inner_text.tag_config("bold", font=("Arial", 12, "bold"))
+    inner_text.tag_config("bullet", lmargin1=18, lmargin2=30)
+    inner_text.tag_config("body", font=("Arial", 12))
 
     def insert_inline(text: str, base_tag: str) -> None:
         pos = 0
         for match in _BOLD_RE.finditer(text):
             if match.start() > pos:
-                textbox.insert("end", text[pos:match.start()], base_tag)
-            textbox.insert("end", match.group(1), (base_tag, "bold"))
+                inner_text.insert("end", text[pos:match.start()], base_tag)
+            inner_text.insert("end", match.group(1), (base_tag, "bold"))
             pos = match.end()
-        textbox.insert("end", text[pos:], base_tag)
+        inner_text.insert("end", text[pos:], base_tag)
 
     for raw_line in markdown_text.splitlines():
         stripped = raw_line.strip()
 
         if stripped.startswith("### "):
             insert_inline(stripped[4:], "h3")
-            textbox.insert("end", "\n\n")
+            inner_text.insert("end", "\n\n")
         elif stripped.startswith("## "):
             insert_inline(stripped[3:], "h2")
-            textbox.insert("end", "\n\n")
+            inner_text.insert("end", "\n\n")
         elif stripped.startswith("# "):
             insert_inline(stripped[2:], "h1")
-            textbox.insert("end", "\n\n")
+            inner_text.insert("end", "\n\n")
         elif stripped.startswith("- ") or stripped.startswith("* "):
-            textbox.insert("end", "•  ", "bullet")
+            inner_text.insert("end", "•  ", "bullet")
             insert_inline(stripped[2:], "bullet")
-            textbox.insert("end", "\n")
+            inner_text.insert("end", "\n")
         elif not stripped:
-            textbox.insert("end", "\n")
+            inner_text.insert("end", "\n")
         else:
             insert_inline(stripped, "body")
-            textbox.insert("end", "\n")
+            inner_text.insert("end", "\n")
 
 
 class DialogWindows:
