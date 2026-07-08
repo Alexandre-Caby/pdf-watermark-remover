@@ -24,12 +24,12 @@ def _render_markdown(textbox: ctk.CTkTextbox, markdown_text: str) -> None:
     '- ' / '* ' bullet lists. This avoids showing raw '##'/'**' syntax
     to the user while keeping legal documents editable as plain .md files.
     """
-    textbox.tag_config("h1", font=("", 16, "bold"))
-    textbox.tag_config("h2", font=("", 14, "bold"))
-    textbox.tag_config("h3", font=("", 13, "bold"))
-    textbox.tag_config("bold", font=("", 12, "bold"))
+    textbox.tag_config("h1", font=("Arial", 16, "bold"))
+    textbox.tag_config("h2", font=("Arial", 14, "bold"))
+    textbox.tag_config("h3", font=("Arial", 13, "bold"))
+    textbox.tag_config("bold", font=("Arial", 12, "bold"))
     textbox.tag_config("bullet", lmargin1=18, lmargin2=30)
-    textbox.tag_config("body", font=("", 12))
+    textbox.tag_config("body", font=("Arial", 12))
 
     def insert_inline(text: str, base_tag: str) -> None:
         pos = 0
@@ -358,7 +358,7 @@ class DialogWindows:
             dialog, text=cp_text, font=ctk.CTkFont(size=12),
         ).pack(pady=(0, 16))
 
-        # Legal text box — takes up the remaining space and scrolls
+        # Legal text box
         legal_box = ctk.CTkTextbox(
             dialog, corner_radius=8, wrap="word",
         )
